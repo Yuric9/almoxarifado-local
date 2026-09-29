@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "desktop": "electron .",
+    "desktop:dev": "concurrently -k \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "desktop:build": "next build"
   },
   "dependencies": {
     "next": "14.2.5",
@@ -20,6 +23,42 @@
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "electron": "^32.1.2",
+    "concurrently": "^9.0.1",
+    "wait-on": "^8.0.1",
+    "electron-builder": "^25.0.5"
+  },
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "br.com.yuric9.almoxarifado",
+    "productName": "Almoxarifado Local",
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "files": [
+      ".next/**/*",
+      "public/**/*",
+      "electron/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "extraMetadata": {}
   }
 }
