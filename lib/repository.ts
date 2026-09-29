@@ -184,3 +184,8 @@ export function retirarReserva(id:number, retiradoPor:string) {
     return reqId
   })()
 }
+
+export function atualizarStatusReserva(id:number,status:'SEPARADO'|'AGUARDANDO_RETIRADA') {
+  const result=db.prepare("UPDATE reservas SET status=? WHERE id=? AND status IN ('SEPARADO','AGUARDANDO_RETIRADA')").run(status,id)
+  if(!result.changes) throw new Error('Reserva não encontrada')
+}
