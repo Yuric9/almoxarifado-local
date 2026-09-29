@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase/client'
 
 type Produto = { id:string, nome:string, categoria_id?:string, quantidade_atual:number, estoque_minimo:number, unidade:string, categoria?:string }
 type Mov = { id:string, produto_id:string, tipo:'ENTRADA'|'SAIDA', quantidade:number, responsavel?:string, observacao?:string, criado_em:string, produto_nome?:string }
@@ -8,12 +7,15 @@ type Mov = { id:string, produto_id:string, tipo:'ENTRADA'|'SAIDA', quantidade:nu
 const CATS = ['Ferramentas','Elétrica','Hidráulica','Limpeza','Geral']
 
 export default function Home(){
-  const [produtos,setProdutos]=useState<Produto[]>([
-    {id:'1',nome:'Parafuso 4mm',quantidade_atual:12,estoque_minimo:20,unidade:'UN',categoria:'Ferramentas'},
-    {id:'2',nome:'Cimento 50kg',quantidade_atual:45,estoque_minimo:10,unidade:'UN',categoria:'Geral'},
-    {id:'3',nome:'Luva de Segurança',quantidade_atual:3,estoque_minimo:15,unidade:'PAR',categoria:'Ferramentas'},
-  ])
+  const [produtos,setProdutos]=useState<Produto[]>([])
   const [movs,setMovs]=useState<Mov[]>([])
+  const [carregando,setCarregando]=useState(true)
+
+  useEffect(()=>{
+    Promise.all([fetch('/api/produtos').then(r=>r.json()),fetch('/api/movimentacoes').then(r=>r.json())])
+      .then(([p,m])=>{setProdutos(p);setMovs(m)})
+      .finally(()=>setCarregando(false))
+  },[])
   const [busca,setBusca]=useState('')
   const [catFiltro,setCatFiltro]=useState('Todas')
   const [showEntrada,setShowEntrada]=useState(false)
@@ -27,15 +29,16 @@ export default function Home(){
 
   function notify(msg:string){ setToast(msg); setTimeout(()=>setToast(''),3000) }
 
-  function registrar(tipo:'ENTRADA'|'SAIDA'){
-    const prod = produtos.find(p=>p.id===form.produto_id)
+  async function registrar(tipo:'ENTRADA'|'SAIDA'){
+    const prod = produtos.find(p=>String(p.id)===String(form.produto_id))
     if(!prod) return
-    if(tipo==='SAIDA' && form.quantidade > prod.quantidade_atual){ notify('❌ Você só tem '+prod.quantidade_atual+' '+prod.unidade+' no estoque!'); return }
-    const novoSaldo = tipo==='ENTRADA' ? prod.quantidade_atual + Number(form.quantidade) : prod.quantidade_atual - Number(form.quantidade)
-    setProdutos(produtos.map(p=> p.id===prod.id ? {...p, quantidade_atual:novoSaldo} : p))
-    setMovs([{id:Date.now().toString(), produto_id:prod.id, tipo, quantidade:Number(form.quantidade), responsavel:form.responsavel||'Você', observacao:form.observacao||'', criado_em:new Date().toISOString(), produto_nome:prod.nome}, ...movs])
-    notify(tipo==='ENTRADA' ? '✅ Entrou '+form.quantidade+' '+prod.unidade : '📦 Saiu '+form.quantidade+' '+prod.unidade)
-    setShowEntrada(false); setShowSaida(false); setForm({})
+    try {
+      const res=await fetch('/api/movimentacoes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({produto_id:Number(form.produto_id),tipo,quantidade:Number(form.quantidade),responsavel:form.responsavel,observacao:form.observacao})})
+      const data=await res.json()
+      if(!res.ok) throw new Error(data.error||'Não foi possível registrar')
+      const [p,m]=await Promise.all([fetch('/api/produtos').then(r=>r.json()),fetch('/api/movimentacoes').then(r=>r.json())])
+      setProdutos(p);setMovs(m);notify(tipo==='ENTRADA' ? '✅ Entrada registrada' : '📦 Saída registrada');setShowEntrada(false);setShowSaida(false);setForm({})
+    } catch(e){ notify('❌ '+(e instanceof Error?e.message:'Erro ao registrar')) }
   }
 
   return (
@@ -110,7 +113,7 @@ export default function Home(){
             <input type="number" placeholder="Qtd Inicial" value={form.qtd||''} onChange={e=>setForm({...form,qtd:e.target.value})} className="h-14 border-2 rounded-xl px-4 text-lg"/>
             <input type="number" placeholder="Mínimo alerta" value={form.min||''} onChange={e=>setForm({...form,min:e.target.value})} className="h-14 border-2 rounded-xl px-4 text-lg"/>
           </div>
-          <div className="flex gap-3"><button onClick={()=>setShowNovo(false)} className="flex-1 h-14 rounded-xl border-2 font-bold text-lg">Cancelar</button><button onClick={()=>{ if(!form.nome) return; setProdutos([...produtos,{id:Date.now().toString(),nome:form.nome,quantidade_atual:Number(form.qtd||0),estoque_minimo:Number(form.min||5),unidade:form.unidade||'UN',categoria:form.categoria||'Geral'}]); setShowNovo(false); setForm({}); notify('✅ Produto criado!')}} className="flex-1 h-14 rounded-xl bg-zinc-900 text-white font-bold text-lg">Salvar</button></div>
+          <div className="flex gap-3"><button onClick={()=>setShowNovo(false)} className="flex-1 h-14 rounded-xl border-2 font-bold text-lg">Cancelar</button><button onClick={async()=>{ if(!form.nome) return; try { const res=await fetch('/api/produtos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:form.nome,quantidade:Number(form.qtd||0),minimo:Number(form.min||5),unidade:form.unidade||'UN'})}); const data=await res.json(); if(!res.ok) throw new Error(data.error||'Erro'); setProdutos(await fetch('/api/produtos').then(r=>r.json())); setShowNovo(false); setForm({}); notify('✅ Produto criado!') } catch(e){notify('❌ '+(e instanceof Error?e.message:'Erro'))}} className="flex-1 h-14 rounded-xl bg-zinc-900 text-white font-bold text-lg">Salvar</button></div>
         </div>
       </div>}
     </div>
