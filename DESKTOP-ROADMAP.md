@@ -9,16 +9,24 @@
 
 ## Etapa 2 — Desktop
 - [x] Estrutura Electron inicial
-- [ ] Ajustar execução do servidor Next no processo desktop
-- [ ] Definir diretório persistente de dados via Electron
+- [x] Ajustar execução do servidor Next no processo desktop
+- [x] Definir diretório persistente de dados via Electron
 - [ ] Empacotar aplicação Windows
 - [ ] Criar instalador NSIS
 - [ ] Criar modo portátil
 - [ ] Testar instalação/atualização sem perda do banco
 
 ## Etapa 3 — Operação
-- [ ] Backup manual
+- [x] Backup manual
 - [ ] Restauração
 - [ ] Exportação CSV
 - [ ] Impressão de relatório
 - [ ] Atualização da aplicação sem apagar dados
+
+## Validação pendente
+
+- [ ] Instalar e executar o instalador NSIS em Windows x64.
+- [ ] Executar a versão portátil em Windows x64.
+- [ ] Confirmar persistência do banco após fechar e reabrir.
+- [ ] Confirmar atualização do aplicativo sem perda do banco.
+- [ ] Validar impressão do comprovante em uma impressora real.
