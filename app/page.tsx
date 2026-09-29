@@ -19,7 +19,6 @@ export default function Home(){
   const [busca,setBusca]=useState('')
   const [catFiltro,setCatFiltro]=useState('Todas')
   const [showEntrada,setShowEntrada]=useState(false)
-  const [showSaida,setShowSaida]=useState(false)
   const [showNovo,setShowNovo]=useState(false)
   const [form,setForm]=useState<any>({})
   const [toast,setToast]=useState('')
@@ -68,13 +67,14 @@ export default function Home(){
 
   async function registrar(tipo:'ENTRADA'|'SAIDA'){
     const prod = produtos.find(p=>String(p.id)===String(form.produto_id))
-    if(!prod) return
+    if(!prod) return notify('❌ Selecione um material')
+    if(Number(form.quantidade)<=0) return notify('❌ Informe uma quantidade maior que zero')
     try {
-      const res=await fetch('/api/movimentacoes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({produto_id:Number(form.produto_id),tipo,quantidade:Number(form.quantidade),responsavel:form.responsavel,observacao:form.observacao})})
+      const res=await fetch('/api/movimentacoes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({produto_id:Number(form.produto_id),tipo:'ENTRADA',quantidade:Number(form.quantidade),observacao:form.observacao})})
       const data=await res.json()
       if(!res.ok) throw new Error(data.error||'Não foi possível registrar')
       const [p,m]=await Promise.all([fetch('/api/produtos').then(r=>r.json()),fetch('/api/movimentacoes').then(r=>r.json())])
-      setProdutos(p);setMovs(m);notify(tipo==='ENTRADA' ? '✅ Entrada registrada' : '📦 Saída registrada');setShowEntrada(false);setShowSaida(false);setForm({})
+      setProdutos(p);setMovs(m);notify('✅ Entrada registrada');setShowEntrada(false);setForm({})
     } catch(e){ notify('❌ '+(e instanceof Error?e.message:'Erro ao registrar')) }
   }
 
@@ -106,7 +106,7 @@ export default function Home(){
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <button onClick={()=>setShowEntrada(true)} className="h-[84px] bg-[#16A34A] hover:bg-green-700 text-white rounded-[20px] text-xl font-bold shadow-lg flex items-center justify-center gap-3">⬇️ ENTRAR Material</button>
+        <button onClick={()=>setShowEntrada(true)} className="h-[84px] bg-[#16A34A] hover:bg-green-700 text-white rounded-[20px] text-xl font-bold shadow-lg flex items-center justify-center gap-3">⬇️ ENTRADA RÁPIDA</button>
         <button onClick={()=>{setRequisicaoCriada(null);setShowRequisicao(true)}} className="h-[84px] bg-[#EA580C] hover:bg-orange-700 text-white rounded-[20px] text-xl font-bold shadow-lg flex items-center justify-center gap-3">📝 REGISTRAR Retirada</button>
       </div>
 
@@ -168,18 +168,18 @@ export default function Home(){
       </div>}
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-8 py-4 rounded-full text-lg font-bold shadow-2xl">{toast}</div>}
 
-      {(showEntrada||showSaida) && <div className="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center p-4 z-50">
+      {showEntrada && <div className="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center p-4 z-50">
         <div className="bg-white rounded-[28px] w-full max-w-lg p-8">
-          <h2 className="text-2xl font-black mb-6">{showEntrada?'⬇️ Entrada de Material':'⬆️ Saída de Material'}</h2>
+          <h2 className="text-2xl font-black mb-2">⬇️ Entrada rápida</h2><p className="text-zinc-500 mb-6">Informe o material, a quantidade e, se quiser, uma observação. O estoque será atualizado na hora.</p>
           <label className="block text-lg font-semibold mb-2">Qual material?</label>
           <select value={form.produto_id||''} onChange={e=>setForm({...form,produto_id:e.target.value})} className="w-full h-14 border-2 rounded-xl px-4 text-lg mb-4">
             <option value="">Selecione...</option>{produtos.map(p=><option key={p.id} value={p.id}>{p.nome} (tem {p.quantidade_atual})</option>)}
           </select>
           <label className="block text-lg font-semibold mb-2">Quantidade</label>
           <input type="number" value={form.quantidade||''} onChange={e=>setForm({...form,quantidade:e.target.value})} className="w-full h-14 border-2 rounded-xl px-4 text-lg mb-4" placeholder="Ex: 10"/>
-          <label className="block text-lg font-semibold mb-2">{showEntrada?'Observação (opcional)':'Quem retirou?'}</label>
-          <input value={showEntrada?form.observacao||'':form.responsavel||''} onChange={e=>setForm({...form,[showEntrada?'observacao':'responsavel']:e.target.value})} className="w-full h-14 border-2 rounded-xl px-4 text-lg mb-6" placeholder={showEntrada?'Ex: Nota fiscal 123':'Ex: João da Manutenção'}/>
-          <div className="flex gap-3"><button onClick={()=>{setShowEntrada(false);setShowSaida(false)}} className="flex-1 h-14 rounded-xl border-2 font-bold text-lg">Cancelar</button><button onClick={()=>registrar(showEntrada?'ENTRADA':'SAIDA')} className={`flex-1 h-14 rounded-xl font-bold text-lg text-white ${showEntrada?'bg-green-600':'bg-orange-600'}`}>Confirmar</button></div>
+          <label className="block text-lg font-semibold mb-2">Observação <span className="font-normal text-zinc-400">(opcional)</span></label>
+          <input value={form.observacao||''} onChange={e=>setForm({...form,observacao:e.target.value})} className="w-full h-14 border-2 rounded-xl px-4 text-lg mb-6" placeholder="Ex: Compra para estoque"/>
+          <div className="flex gap-3"><button onClick={()=>{setShowEntrada(false);setForm({})}} className="flex-1 h-14 rounded-xl border-2 font-bold text-lg">Cancelar</button><button onClick={registrarEntrada} className={`flex-1 h-14 rounded-xl font-bold text-lg text-white ${showEntrada?'bg-green-600':'bg-orange-600'}`}>Confirmar</button></div>
         </div>
       </div>}
 
