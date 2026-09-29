@@ -85,7 +85,7 @@ function addColumnIfMissing(table: string, column: string, definition: string) {
 function migrateLegacyReservations() {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='reservas'").get() as { sql?: string } | undefined
   const sql = row?.sql || ''
-  const legacySchema = sql.includes('RESERVADA') || sql.includes('CANCELADA') || sql.includes('RETIRADA')
+  const legacySchema = sql.includes("'RESERVADA'") || sql.includes("'CANCELADA'") || sql.includes("'RETIRADA'")
   if (!legacySchema) return
 
   const rows = db.prepare('SELECT id, numero, finalidade, reservado_por, observacao, status, criado_em FROM reservas').all() as Array<{
