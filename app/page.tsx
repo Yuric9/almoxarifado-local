@@ -201,7 +201,7 @@ export default function Home(){
           <input type="number" value={form.quantidade||''} onChange={e=>setForm({...form,quantidade:e.target.value})} className="w-full h-14 border-2 rounded-xl px-4 text-lg mb-4" placeholder="Ex: 10"/>
           <label className="block text-lg font-semibold mb-2">Observação <span className="font-normal text-zinc-400">(opcional)</span></label>
           <input value={form.observacao||''} onChange={e=>setForm({...form,observacao:e.target.value})} className="w-full h-14 border-2 rounded-xl px-4 text-lg mb-6" placeholder="Ex: Compra para estoque"/>
-          <div className="flex gap-3"><button onClick={()=>{setShowEntrada(false);setForm({})}} className="flex-1 h-14 rounded-xl border-2 font-bold text-lg">Cancelar</button><button onClick={registrarEntrada} className={`flex-1 h-14 rounded-xl font-bold text-lg text-white ${showEntrada?'bg-green-600':'bg-orange-600'}`}>Confirmar</button></div>
+          <div className="flex gap-3"><button onClick={()=>{setShowEntrada(false);setForm({})}} className="flex-1 h-14 rounded-xl border-2 font-bold text-lg">Cancelar</button><button onClick={()=>registrar('ENTRADA')} className={`flex-1 h-14 rounded-xl font-bold text-lg text-white ${showEntrada?'bg-green-600':'bg-orange-600'}`}>Confirmar</button></div>
         </div>
       </div>}
 
