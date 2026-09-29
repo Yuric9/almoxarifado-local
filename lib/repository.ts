@@ -28,12 +28,13 @@ export function criarProduto(input:{nome:string; categoria_id:number|null; quant
   return tx()
 }
 
-export function registrarMovimentacao(input:{produto_id:number; tipo:'ENTRADA'|'SAIDA'; quantidade:number; responsavel?:string; observacao?:string}) {
+export function registrarMovimentacao(input:{produto_id:number; tipo:'ENTRADA'|'SAIDA'; quantidade:number; responsavel?:string; observacao?:string; requisicao_id?:number}) {
   const tx = db.transaction(() => {
     const produto = db.prepare('SELECT quantidade_atual FROM produtos WHERE id=?').get(input.produto_id) as {quantidade_atual:number}|undefined
     if (!produto) throw new Error('Produto não encontrado')
     if (input.quantidade <= 0) throw new Error('Quantidade deve ser maior que zero')
-    if (input.tipo === 'SAIDA' && produto.quantidade_atual < input.quantidade) throw new Error(`Estoque insuficiente. Disponível: ${produto.quantidade_atual}`)
+    if (input.tipo === 'SAIDA' && !input.requisicao_id) throw new Error('Toda saída de material deve estar vinculada a uma requisição de retirada')
+    if (input.tipo === 'SAIDA' && input.quantidade > produto.quantidade_atual) throw new Error(`Estoque insuficiente. Disponível: ${produto.quantidade_atual}`)
     const delta = input.tipo === 'ENTRADA' ? input.quantidade : -input.quantidade
     db.prepare('UPDATE produtos SET quantidade_atual=quantidade_atual+? WHERE id=?').run(delta,input.produto_id)
     db.prepare('INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao) VALUES (?,?,?,?,?)').run(input.produto_id,input.tipo,input.quantidade,input.responsavel ?? null,input.observacao ?? null)
