@@ -40,3 +40,27 @@ export function registrarMovimentacao(input:{produto_id:number; tipo:'ENTRADA'|'
   })
   tx()
 }
+
+
+export function exportarBanco() {
+  const row = db.prepare("PRAGMA database_list").get() as { file:string }
+  return row.file
+}
+
+export function importarDados(dados: {categorias?: any[]; produtos?: any[]; movimentacoes?: any[]}) {
+  const tx = db.transaction(() => {
+    if (dados.categorias) {
+      const insert = db.prepare('INSERT OR IGNORE INTO categorias (id,nome,cor) VALUES (?,?,?)')
+      for (const c of dados.categorias) insert.run(c.id,c.nome,c.cor ?? '#2563EB')
+    }
+    if (dados.produtos) {
+      const insert = db.prepare('INSERT OR REPLACE INTO produtos (id,nome,categoria_id,quantidade_atual,estoque_minimo,unidade,criado_em) VALUES (?,?,?,?,?,?,?)')
+      for (const p of dados.produtos) insert.run(p.id,p.nome,p.categoria_id ?? null,p.quantidade_atual ?? 0,p.estoque_minimo ?? 5,p.unidade ?? 'UN',p.criado_em ?? new Date().toISOString())
+    }
+    if (dados.movimentacoes) {
+      const insert = db.prepare('INSERT OR REPLACE INTO movimentacoes (id,produto_id,tipo,quantidade,responsavel,observacao,criado_em) VALUES (?,?,?,?,?,?,?)')
+      for (const m of dados.movimentacoes) insert.run(m.id,m.produto_id,m.tipo,m.quantidade,m.responsavel ?? null,m.observacao ?? null,m.criado_em ?? new Date().toISOString())
+    }
+  })
+  tx()
+}
