@@ -26,8 +26,34 @@ O arquivo `supabase.sql` é preservado como referência do modelo online. Durant
 
 ## Importante
 
-A branch `feature/app-local` ainda contém a implementação original do MVP. A conversão para SQLite/Electron será feita em etapas, com testes antes de cada marco.
+A branch `feature/app-local` concentra a conversão para SQLite/Electron em etapas. A `main` permanece estável até a validação do aplicativo desktop em Windows.
 
 ## Requisições de retirada
 
 As retiradas de materiais são registradas como **Requisição de Material / Comprovante de Retirada**, com número automático, pessoa que retirou, setor, finalidade, materiais, quantidades, responsável pela entrega e impressão do comprovante. A baixa do estoque fica vinculada à requisição.
+
+## Operação de estoque
+
+### Entrada rápida
+A entrada de material é propositalmente simples: material, quantidade e observação opcional. Não exige fornecedor, nota fiscal ou dados de empresa.
+
+### Requisição / retirada
+Toda saída comum deve nascer de uma **Requisição de Material / Comprovante de Retirada**. A baixa do estoque fica vinculada à requisição e a movimentação registra sua origem.
+
+### Reservas / pedidos separados
+Um pedido pode reservar materiais sem baixar o estoque físico. O ciclo é:
+1. **SEPARADO** — quantidade bloqueada para aquele pedido.
+2. **AGUARDANDO_RETIRADA** — pedido pronto e aguardando a pessoa.
+3. **RETIRADO** — retirada concluída; estoque físico é baixado e uma requisição é criada.
+4. **CANCELADO** — reserva liberada e quantidade volta a ficar disponível.
+
+O sistema diferencia **estoque físico**, **quantidade reservada** e **quantidade disponível**. Uma retirada comum não pode consumir material que esteja reservado.
+
+### Auditoria
+Movimentações guardam a origem (`ENTRADA_MANUAL`, `ESTOQUE_INICIAL`, `REQUISICAO` ou `RESERVA`) e, quando aplicável, o vínculo com a requisição.
+
+### Migração de bancos antigos
+Ao abrir um banco local antigo, a aplicação converte automaticamente os status legados de reserva:
+- `RESERVADA` → `SEPARADO`
+- `RETIRADA` → `RETIRADO`
+- `CANCELADA` → `CANCELADO`
