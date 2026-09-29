@@ -35,7 +35,7 @@
   "build": {
     "appId": "br.com.yuric9.almoxarifado",
     "productName": "Almoxarifado Local",
-    "asar": true,
+    "asar": false,
     "directories": {
       "output": "release"
     },
