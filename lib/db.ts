@@ -2,7 +2,7 @@ import Database from 'better-sqlite3'
 import path from 'node:path'
 import fs from 'node:fs'
 
-const dataDir = path.join(process.cwd(), 'data')
+const dataDir = process.env.ALMOXARIFADO_DATA_DIR || path.join(process.cwd(), 'data')
 fs.mkdirSync(dataDir, { recursive: true })
 
 export const db = new Database(path.join(dataDir, 'almoxarifado.db'))
