@@ -1,11 +1,13 @@
 import { db } from './db'
 
-export type Produto = { id:number; nome:string; categoria_id:number|null; quantidade_atual:number; estoque_minimo:number; unidade:string; categoria:string|null }
+export type Produto = { id:number; nome:string; categoria_id:number|null; quantidade_atual:number; estoque_minimo:number; unidade:string; categoria:string|null; quantidade_reservada:number; quantidade_disponivel:number }
 export type Movimentacao = { id:number; produto_id:number; tipo:'ENTRADA'|'SAIDA'; quantidade:number; responsavel:string|null; observacao:string|null; criado_em:string; produto_nome:string }
 
 export function listarProdutos(): Produto[] {
   return db.prepare(`
-    SELECT p.*, c.nome AS categoria
+    SELECT p.*, c.nome AS categoria,
+      COALESCE((SELECT SUM(ri.quantidade) FROM reserva_itens ri JOIN reservas r ON r.id=ri.reserva_id WHERE ri.produto_id=p.id AND r.status='RESERVADA'),0) AS quantidade_reservada,
+      p.quantidade_atual - COALESCE((SELECT SUM(ri.quantidade) FROM reserva_itens ri JOIN reservas r ON r.id=ri.reserva_id WHERE ri.produto_id=p.id AND r.status='RESERVADA'),0) AS quantidade_disponivel
     FROM produtos p LEFT JOIN categorias c ON c.id=p.categoria_id
     ORDER BY p.nome
   `).all() as Produto[]
@@ -110,4 +112,52 @@ export function criarRequisicao(input:RequisicaoInput) {
     return requisicaoId
   })
   return tx()
+}
+
+
+export type ReservaItemInput = { produto_id:number; quantidade:number }
+export type ReservaInput = { finalidade:string; reservado_por?:string; observacao?:string; itens:ReservaItemInput[] }
+
+export function listarReservas() {
+  return db.prepare(`
+    SELECT r.*, COUNT(ri.id) AS total_itens
+    FROM reservas r LEFT JOIN reserva_itens ri ON ri.reserva_id=r.id
+    GROUP BY r.id ORDER BY r.id DESC LIMIT 200
+  `).all() as any[]
+}
+
+export function obterReserva(id:number) {
+  const reserva = db.prepare('SELECT * FROM reservas WHERE id=?').get(id) as any
+  if (!reserva) throw new Error('Reserva não encontrada')
+  const itens = db.prepare('SELECT * FROM reserva_itens WHERE reserva_id=? ORDER BY id').all(id)
+  return { ...reserva, itens }
+}
+
+export function criarReserva(input:ReservaInput) {
+  return db.transaction(() => {
+    const finalidade=input.finalidade?.trim()
+    if (!finalidade) throw new Error('Informe para que o material será reservado')
+    if (!input.itens?.length) throw new Error('Adicione pelo menos um material')
+    const numero=`RES-${new Date().getFullYear()}-${String(((db.prepare('SELECT COALESCE(MAX(id),0)+1 AS proximo FROM reservas').get() as any).proximo)).padStart(6,'0')}`
+    const reserva=db.prepare('INSERT INTO reservas (numero,finalidade,reservado_por,observacao) VALUES (?,?,?,?)').run(numero,finalidade,input.reservado_por?.trim()||null,input.observacao?.trim()||null)
+    const reservaId=Number(reserva.lastInsertRowid)
+    const produtoStmt=db.prepare(`SELECT p.id,p.nome,p.unidade,p.quantidade_atual,
+      COALESCE((SELECT SUM(ri.quantidade) FROM reserva_itens ri JOIN reservas r ON r.id=ri.reserva_id WHERE ri.produto_id=p.id AND r.status='RESERVADA'),0) AS reservada
+      FROM produtos p WHERE p.id=?`)
+    const item=db.prepare('INSERT INTO reserva_itens (reserva_id,produto_id,quantidade,unidade,produto_nome) VALUES (?,?,?,?,?)')
+    for (const entrada of input.itens) {
+      const quantidade=Number(entrada.quantidade); const produto=produtoStmt.get(entrada.produto_id) as any
+      if (!produto) throw new Error('Produto não encontrado')
+      if (!Number.isFinite(quantidade)||quantidade<=0) throw new Error('Quantidade inválida')
+      const disponivel=produto.quantidade_atual-Number(produto.reservada||0)
+      if (disponivel<quantidade) throw new Error(`Não há quantidade disponível para ${produto.nome}. Disponível para reserva: ${disponivel} ${produto.unidade}`)
+      item.run(reservaId,produto.id,quantidade,produto.unidade,produto.nome)
+    }
+    return reservaId
+  })()
+}
+
+export function cancelarReserva(id:number) {
+  const result=db.prepare("UPDATE reservas SET status='CANCELADA' WHERE id=? AND status='RESERVADA'").run(id)
+  if (!result.changes) throw new Error('Reserva não encontrada ou já encerrada')
 }
