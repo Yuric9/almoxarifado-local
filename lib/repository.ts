@@ -6,8 +6,8 @@ export type Movimentacao = { id:number; produto_id:number; tipo:'ENTRADA'|'SAIDA
 export function listarProdutos(): Produto[] {
   return db.prepare(`
     SELECT p.*, c.nome AS categoria,
-      COALESCE((SELECT SUM(ri.quantidade) FROM reserva_itens ri JOIN reservas r ON r.id=ri.reserva_id WHERE ri.produto_id=p.id AND r.status='RESERVADA'),0) AS quantidade_reservada,
-      p.quantidade_atual - COALESCE((SELECT SUM(ri.quantidade) FROM reserva_itens ri JOIN reservas r ON r.id=ri.reserva_id WHERE ri.produto_id=p.id AND r.status='RESERVADA'),0) AS quantidade_disponivel
+      COALESCE((SELECT SUM(ri.quantidade) FROM reserva_itens ri JOIN reservas r ON r.id=ri.reserva_id WHERE ri.produto_id=p.id AND r.status IN ('SEPARADO','AGUARDANDO_RETIRADA')),0) AS quantidade_reservada,
+      p.quantidade_atual - COALESCE((SELECT SUM(ri.quantidade) FROM reserva_itens ri JOIN reservas r ON r.id=ri.reserva_id WHERE ri.produto_id=p.id AND r.status IN ('SEPARADO','AGUARDANDO_RETIRADA')),0) AS quantidade_disponivel
     FROM produtos p LEFT JOIN categorias c ON c.id=p.categoria_id
     ORDER BY p.nome
   `).all() as Produto[]
@@ -159,7 +159,7 @@ export function criarReserva(input:ReservaInput) {
 }
 
 export function cancelarReserva(id:number) {
-  const result=db.prepare("UPDATE reservas SET status='CANCELADA' WHERE id=? AND status='RESERVADA'").run(id)
+  const result=db.prepare("UPDATE reservas SET status='CANCELADO' WHERE id=? AND status IN ('SEPARADO','AGUARDANDO_RETIRADA')").run(id)
   if (!result.changes) throw new Error('Reserva não encontrada ou já encerrada')
 }
 
@@ -168,7 +168,7 @@ export function retirarReserva(id:number, retiradoPor:string) {
   return db.transaction(() => {
     const nome=retiradoPor?.trim()
     if(!nome) throw new Error('Informe quem está retirando o pedido')
-    const reserva=db.prepare("SELECT * FROM reservas WHERE id=? AND status='RESERVADA'").get(id) as any
+    const reserva=db.prepare("SELECT * FROM reservas WHERE id=? AND status IN ('SEPARADO','AGUARDANDO_RETIRADA')").get(id) as any
     if(!reserva) throw new Error('Reserva não encontrada ou já encerrada')
     const itens=db.prepare('SELECT * FROM reserva_itens WHERE reserva_id=? ORDER BY id').all(id) as any[]
     if(!itens.length) throw new Error('A reserva não possui materiais')
@@ -180,7 +180,7 @@ export function retirarReserva(id:number, retiradoPor:string) {
     const item=db.prepare('INSERT INTO requisicao_itens (requisicao_id,produto_id,quantidade,unidade,produto_nome) VALUES (?,?,?,?,?)')
     const mov=db.prepare('INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao) VALUES (?,?,?,?,?)')
     for(const i of itens){ const p=produto.get(i.produto_id) as any; if(!p||p.quantidade_atual<i.quantidade) throw new Error(`Estoque insuficiente para ${i.produto_nome}`); update.run(i.quantidade,i.produto_id); item.run(reqId,i.produto_id,i.quantidade,i.unidade,i.produto_nome); mov.run(i.produto_id,'SAIDA',i.quantidade,nome,`Retirada da reserva ${reserva.numero} - Requisição ${numeroReq}`) }
-    db.prepare("UPDATE reservas SET status='RETIRADA' WHERE id=?").run(id)
+    db.prepare("UPDATE reservas SET status='RETIRADO' WHERE id=?").run(id)
     return reqId
   })()
 }
