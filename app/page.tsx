@@ -23,6 +23,15 @@ export default function Home(){
   const [showNovo,setShowNovo]=useState(false)
   const [form,setForm]=useState<any>({})
   const [toast,setToast]=useState('')
+  const [backupStatus,setBackupStatus]=useState('')
+
+  async function fazerBackup(){
+    try{
+      const res=await fetch('/api/backup')
+      if(!res.ok) throw new Error('Não foi possível gerar o backup')
+      const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='almoxarifado-backup.db'; a.click(); URL.revokeObjectURL(url); setBackupStatus('Backup gerado com sucesso'); setTimeout(()=>setBackupStatus(''),3000)
+    }catch(e){setBackupStatus(e instanceof Error?e.message:'Erro no backup')}
+  }
 
   const alerta = produtos.filter(p=>p.quantidade_atual <= p.estoque_minimo)
   const filtrados = produtos.filter(p=> (catFiltro==='Todas' || p.categoria===catFiltro) && p.nome.toLowerCase().includes(busca.toLowerCase()))
@@ -49,6 +58,9 @@ export default function Home(){
           <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="🔍 Buscar material... ex: parafuso" className="w-full h-14 rounded-2xl border-2 border-zinc-200 px-6 text-lg focus:border-blue-500 outline-none"/>
         </div>
       </header>
+
+      <div className="flex justify-end mb-4"><button onClick={fazerBackup} className="px-4 py-2 rounded-xl border-2 border-zinc-200 bg-white font-semibold hover:bg-zinc-50">💾 Fazer backup</button></div>
+      {backupStatus && <div className="mb-4 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3">{backupStatus}</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-white rounded-[24px] p-6 shadow-sm border"><p className="text-zinc-500 text-lg">Total de Itens</p><p className="text-4xl font-bold">{produtos.length}</p></div>
