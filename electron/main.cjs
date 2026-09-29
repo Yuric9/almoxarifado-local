@@ -5,13 +5,12 @@ const path = require('node:path')
 let serverProcess
 
 function startNextServer() {
-  const nextBin = process.platform === 'win32'
-    ? path.join(process.resourcesPath, 'app', 'node_modules', 'next', 'dist', 'bin', 'next')
-    : path.join(process.resourcesPath, 'app', 'node_modules', 'next', 'dist', 'bin', 'next')
-  const cwd = path.join(process.resourcesPath, 'app')
+  const appDir = path.join(process.resourcesPath, 'app')
+  const nextBin = path.join(appDir, 'node_modules', 'next', 'dist', 'bin', 'next')
   const dataDir = path.join(app.getPath('userData'), 'data')
-  const env = { ...process.env, ALMOXARIFADO_DATA_DIR: dataDir }
-  serverProcess = spawn(process.execPath, [nextBin, 'start', '-p', '3000'], { cwd, env, windowsHide: true })
+  const env = { ...process.env, ALMOXARIFADO_DATA_DIR: dataDir, NODE_ENV: 'production' }
+  serverProcess = spawn(process.execPath, [nextBin, 'start', '-p', '3000'], { cwd: appDir, env, windowsHide: true })
+  serverProcess.on('error', (err) => console.error('Next server error:', err))
 }
 
 function createWindow() {
@@ -25,12 +24,10 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  if (app.isPackaged) startNextServer()
-  setTimeout(createWindow, app.isPackaged ? 1200 : 0)
+  startNextServer()
+  setTimeout(createWindow, 1500)
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
 
-app.on('before-quit', () => {
-  if (serverProcess) serverProcess.kill()
-})
+app.on('before-quit', () => { if (serverProcess) serverProcess.kill() })
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
