@@ -32,6 +32,25 @@ CREATE TABLE IF NOT EXISTS movimentacoes (
   observacao TEXT,
   criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS requisicoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  numero TEXT NOT NULL UNIQUE,
+  retirado_por TEXT NOT NULL,
+  setor TEXT,
+  finalidade TEXT,
+  entregue_por TEXT,
+  observacao TEXT,
+  status TEXT NOT NULL DEFAULT 'FINALIZADA' CHECK (status IN ('FINALIZADA','CANCELADA')),
+  criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS requisicao_itens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  requisicao_id INTEGER NOT NULL REFERENCES requisicoes(id) ON DELETE CASCADE,
+  produto_id INTEGER NOT NULL REFERENCES produtos(id),
+  quantidade REAL NOT NULL CHECK (quantidade > 0),
+  unidade TEXT NOT NULL,
+  produto_nome TEXT NOT NULL
+);
 `)
 
 const count = db.prepare('SELECT COUNT(*) AS total FROM categorias').get() as { total:number }
