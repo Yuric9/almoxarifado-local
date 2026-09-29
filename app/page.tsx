@@ -107,7 +107,7 @@ export default function Home(){
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         <button onClick={()=>setShowEntrada(true)} className="h-[84px] bg-[#16A34A] hover:bg-green-700 text-white rounded-[20px] text-xl font-bold shadow-lg flex items-center justify-center gap-3">⬇️ ENTRAR Material</button>
-        <button onClick={()=>setShowSaida(true)} className="h-[84px] bg-[#EA580C] hover:bg-orange-700 text-white rounded-[20px] text-xl font-bold shadow-lg flex items-center justify-center gap-3">⬆️ TIRAR Material</button>
+        <button onClick={()=>{setRequisicaoCriada(null);setShowRequisicao(true)}} className="h-[84px] bg-[#EA580C] hover:bg-orange-700 text-white rounded-[20px] text-xl font-bold shadow-lg flex items-center justify-center gap-3">📝 REGISTRAR Retirada</button>
       </div>
 
       {alerta.length>0 && <div className="bg-white border-2 border-red-200 rounded-[20px] p-5 mb-8"><h3 className="font-bold text-red-700 text-lg mb-3">⚠️ Precisa repor:</h3><div className="flex flex-wrap gap-2">{alerta.map(a=><span key={a.id} className="bg-red-100 text-red-800 px-4 py-2 rounded-full font-semibold">{a.nome} - só {a.quantidade_atual} {a.unidade}</span>)}</div></div>}
