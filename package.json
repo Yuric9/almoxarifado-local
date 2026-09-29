@@ -8,7 +8,8 @@
     "start": "next start",
     "desktop": "electron .",
     "desktop:dev": "concurrently -k \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "desktop:build": "next build"
+    "desktop:build": "next build",
+    "desktop:package": "npm run build && electron-builder"
   },
   "dependencies": {
     "next": "14.2.5",
@@ -33,8 +34,19 @@
   "build": {
     "appId": "br.com.yuric9.almoxarifado",
     "productName": "Almoxarifado Local",
+    "asar": true,
     "directories": {
       "output": "release"
+    },
+    "files": [
+      ".next/**/*",
+      "public/**/*",
+      "electron/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.cjs"
     },
     "win": {
       "target": [
@@ -52,13 +64,14 @@
         }
       ]
     },
-    "files": [
-      ".next/**/*",
-      "public/**/*",
-      "electron/**/*",
-      "package.json",
-      "node_modules/**/*"
-    ],
-    "extraMetadata": {}
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "Almoxarifado-Local-Portable.exe"
+    }
   }
 }
