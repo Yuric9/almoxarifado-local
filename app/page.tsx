@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 
-type Produto = { id:string, nome:string, categoria_id?:string, quantidade_atual:number, estoque_minimo:number, unidade:string, categoria?:string }
+type Produto = { id:string, nome:string, categoria_id?:string, quantidade_atual:number, estoque_minimo:number, unidade:string, categoria?:string, quantidade_reservada:number, quantidade_disponivel:number }
 type Mov = { id:string, produto_id:string, tipo:'ENTRADA'|'SAIDA', quantidade:number, responsavel?:string, observacao?:string, criado_em:string, produto_nome?:string }
 
 const CATS = ['Ferramentas','Elétrica','Hidráulica','Limpeza','Geral']
@@ -20,6 +20,9 @@ export default function Home(){
   const [catFiltro,setCatFiltro]=useState('Todas')
   const [showEntrada,setShowEntrada]=useState(false)
   const [showNovo,setShowNovo]=useState(false)
+  const [showReserva,setShowReserva]=useState(false)
+  const [reservas,setReservas]=useState<any[]>([])
+  const [reserva,setReserva]=useState<any>({finalidade:'',reservado_por:'',observacao:'',itens:[{produto_id:'',quantidade:''}]})
   const [form,setForm]=useState<any>({})
   const [toast,setToast]=useState('')
   const [backupStatus,setBackupStatus]=useState('')
@@ -37,7 +40,20 @@ export default function Home(){
   }
 
   async function carregarRequisicoes(){ const res=await fetch('/api/requisicoes'); if(res.ok) setRequisicoes(await res.json()) }
-  useEffect(()=>{ carregarRequisicoes() },[])
+  useEffect(()=>{ carregarRequisicoes(); carregarReservas() },[])
+  async function carregarReservas(){ const res=await fetch('/api/reservas'); if(res.ok) setReservas(await res.json()) }
+  function adicionarItemReserva(){ setReserva((r:any)=>({...r,itens:[...r.itens,{produto_id:'',quantidade:''}]})) }
+  function removerItemReserva(index:number){ setReserva((r:any)=>({...r,itens:r.itens.filter((_:any,i:number)=>i!==index)})) }
+  function atualizarItemReserva(index:number,campo:string,valor:any){ setReserva((r:any)=>({...r,itens:r.itens.map((item:any,i:number)=>i===index?{...item,[campo]:valor}:item)})) }
+  async function criarReserva(){
+    try{
+      const itens=reserva.itens.filter((i:any)=>i.produto_id&&Number(i.quantidade)>0).map((i:any)=>({produto_id:Number(i.produto_id),quantidade:Number(i.quantidade)}))
+      const res=await fetch('/api/reservas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...reserva,itens})})
+      const data=await res.json(); if(!res.ok) throw new Error(data.error||'Não foi possível reservar')
+      setShowReserva(false); setReserva({finalidade:'',reservado_por:'',observacao:'',itens:[{produto_id:'',quantidade:''}]}); await carregarReservas(); setProdutos(await fetch('/api/produtos').then(r=>r.json())); notify('✅ Pedido separado e reservado: '+data.id)
+    }catch(e){notify('❌ '+(e instanceof Error?e.message:'Erro ao reservar'))}
+  }
+  async function cancelarReserva(id:number){ try{ const res=await fetch('/api/reservas/'+id,{method:'DELETE'}); const data=await res.json(); if(!res.ok) throw new Error(data.error||'Erro'); await carregarReservas(); setProdutos(await fetch('/api/produtos').then(r=>r.json())); notify('✅ Reserva liberada')}catch(e){notify('❌ '+(e instanceof Error?e.message:'Erro'))} }
 
   function adicionarItemRequisicao(){ setRequisicao((r:any)=>({...r,itens:[...r.itens,{produto_id:'',quantidade:''}]})) }
   function removerItemRequisicao(index:number){ setRequisicao((r:any)=>({...r,itens:r.itens.filter((_:any,i:number)=>i!==index)})) }
@@ -89,6 +105,7 @@ export default function Home(){
 
       <div className="flex flex-wrap justify-end gap-2 mb-4">
         <button onClick={()=>{setRequisicaoCriada(null);setShowRequisicao(true)}} className="px-4 py-2 rounded-xl bg-orange-600 text-white font-bold">📝 Nova retirada</button>
+        <button onClick={()=>setShowReserva(true)} className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold">📦 Separar pedido</button>
         <button onClick={fazerBackup} className="px-4 py-2 rounded-xl border-2 border-zinc-200 bg-white font-semibold hover:bg-zinc-50">💾 Fazer backup</button></div>
       {requisicoes.length>0 && <div className="mb-6 bg-white rounded-[20px] border p-5">
         <div className="flex items-center justify-between mb-3"><h3 className="text-xl font-bold">Últimas requisições de retirada</h3><button onClick={()=>setShowRequisicao(true)} className="text-blue-600 font-bold">Nova retirada</button></div>
@@ -107,8 +124,11 @@ export default function Home(){
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         <button onClick={()=>setShowEntrada(true)} className="h-[84px] bg-[#16A34A] hover:bg-green-700 text-white rounded-[20px] text-xl font-bold shadow-lg flex items-center justify-center gap-3">⬇️ ENTRADA RÁPIDA</button>
+        <button onClick={()=>setShowReserva(true)} className="h-[84px] bg-[#2563EB] hover:bg-blue-700 text-white rounded-[20px] text-xl font-bold shadow-lg flex items-center justify-center gap-3">📦 SEPARAR Pedido</button>
         <button onClick={()=>{setRequisicaoCriada(null);setShowRequisicao(true)}} className="h-[84px] bg-[#EA580C] hover:bg-orange-700 text-white rounded-[20px] text-xl font-bold shadow-lg flex items-center justify-center gap-3">📝 REGISTRAR Retirada</button>
       </div>
+
+      {reservas.filter(r=>r.status==='RESERVADA').length>0 && <div className="mb-8 bg-blue-50 border-2 border-blue-200 rounded-[20px] p-5"><div className="flex items-center justify-between mb-3"><h3 className="font-bold text-blue-800 text-lg">📦 Materiais separados / reservados</h3><button onClick={()=>setShowReserva(true)} className="text-blue-700 font-bold">Separar outro pedido</button></div><div className="space-y-2">{reservas.filter(r=>r.status==='RESERVADA').slice(0,5).map(r=><div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-200 last:border-0 py-3"><div><p className="font-bold">{r.numero} · {r.finalidade}</p><p className="text-sm text-blue-700">{r.total_itens} item(ns) · {r.reservado_por||'Sem responsável'} · {new Date(r.criado_em).toLocaleString('pt-BR')}</p></div><button onClick={()=>cancelarReserva(r.id)} className="px-3 py-2 rounded-lg border border-blue-300 bg-white font-semibold text-red-600">Liberar reserva</button></div>)}</div></div>}
 
       {alerta.length>0 && <div className="bg-white border-2 border-red-200 rounded-[20px] p-5 mb-8"><h3 className="font-bold text-red-700 text-lg mb-3">⚠️ Precisa repor:</h3><div className="flex flex-wrap gap-2">{alerta.map(a=><span key={a.id} className="bg-red-100 text-red-800 px-4 py-2 rounded-full font-semibold">{a.nome} - só {a.quantidade_atual} {a.unidade}</span>)}</div></div>}
 
@@ -133,6 +153,8 @@ export default function Home(){
 
       {movs.length>0 && <div className="mt-10 bg-white rounded-[20px] p-6 border"><h3 className="text-xl font-bold mb-4">Histórico Recente</h3><div className="space-y-3">{movs.slice(0,8).map(m=><div key={m.id} className="flex gap-3 items-center"><div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${m.tipo==='ENTRADA'?'bg-green-600':'bg-orange-600'}`}>{m.tipo==='ENTRADA'?'↓':'↑'}</div><div><p className="font-semibold">{m.tipo} - {m.produto_nome} - {m.quantidade} UN</p><p className="text-sm text-zinc-500">{m.responsavel} • {new Date(m.criado_em).toLocaleString('pt-BR')}</p></div></div>)}</div></div>}
 
+
+      {showReserva && <div className="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center p-4 z-50"><div className="bg-white rounded-[28px] w-full max-w-3xl p-6 md:p-8 max-h-[92vh] overflow-auto"><div className="flex justify-between items-start gap-4 mb-6"><div><h2 className="text-2xl font-black">📦 Separar pedido</h2><p className="text-zinc-500">Separe materiais do estoque e deixe-os reservados até a retirada.</p></div><button onClick={()=>setShowReserva(false)} className="text-2xl">×</button></div><div className="grid md:grid-cols-2 gap-3 mb-5"><input placeholder="Pedido / finalidade * ex: Reforma da cozinha" value={reserva.finalidade} onChange={e=>setReserva({...reserva,finalidade:e.target.value})} className="h-13 border-2 rounded-xl px-4"/><input placeholder="Responsável (opcional)" value={reserva.reservado_por} onChange={e=>setReserva({...reserva,reservado_por:e.target.value})} className="h-13 border-2 rounded-xl px-4"/></div><h3 className="font-bold text-lg mb-3">Materiais a separar</h3><div className="space-y-3">{reserva.itens.map((item:any,index:number)=>{const p=produtos.find(x=>String(x.id)===String(item.produto_id));const disp=p?.quantidade_disponivel??0;return <div key={index} className="grid grid-cols-[1fr_110px_auto] gap-2"><select value={item.produto_id} onChange={e=>atualizarItemReserva(index,'produto_id',e.target.value)} className="h-13 border-2 rounded-xl px-3"><option value="">Selecione o material</option>{produtos.map(p=><option key={p.id} value={p.id}>{p.nome} — disponível: {p.quantidade_disponivel} {p.unidade}</option>)}</select><input type="number" min="0.01" placeholder="Qtd." value={item.quantidade} onChange={e=>atualizarItemReserva(index,'quantidade',e.target.value)} className="h-13 border-2 rounded-xl px-3"/><button onClick={()=>removerItemReserva(index)} disabled={reserva.itens.length===1} className="px-3 rounded-xl border text-red-600 disabled:opacity-30">Remover</button>{p&&Number(item.quantidade)>disp&&<p className="col-span-3 text-sm font-semibold text-red-600">⚠️ Só {disp} {p.unidade} estão disponíveis para reserva. O restante já está reservado.</p>}</div>})}</div><button onClick={adicionarItemReserva} className="mt-3 text-blue-600 font-bold">+ Adicionar outro material</button><textarea placeholder="Observação (opcional)" value={reserva.observacao} onChange={e=>setReserva({...reserva,observacao:e.target.value})} className="w-full border-2 rounded-xl p-3 mt-5 min-h-20"/><div className="flex gap-3 mt-5"><button onClick={()=>setShowReserva(false)} className="flex-1 h-13 rounded-xl border-2 font-bold">Cancelar</button><button onClick={criarReserva} className="flex-1 h-13 rounded-xl bg-blue-600 text-white font-bold">Confirmar separação</button></div></div></div>}
 
       {showRequisicao && <div className="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center p-4 z-50">
         <div className="bg-white rounded-[28px] w-full max-w-3xl p-6 md:p-8 max-h-[92vh] overflow-auto">
