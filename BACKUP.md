@@ -2,12 +2,21 @@
 
 ## Backup
 
-Na aplicação local, o botão **Fazer backup** baixa uma cópia do arquivo SQLite como `almoxarifado-backup.db`.
+O botão **Fazer backup** gera uma cópia SQLite consistente usando o mecanismo nativo de backup do banco. O arquivo baixado é `almoxarifado-backup.db`.
+
+Isso evita depender de uma simples cópia do arquivo principal enquanto o SQLite está em modo WAL.
 
 ## Onde os dados ficam
 
-Em instalação desktop, o banco deve ficar no diretório de dados do usuário e não dentro da pasta do programa. Isso permite atualizar o aplicativo sem apagar o estoque.
+Em instalação desktop, o banco fica no diretório de dados do usuário e não dentro da pasta do programa. Isso permite atualizar o aplicativo sem apagar o estoque.
 
 ## Recuperação
 
-A restauração será adicionada em uma etapa própria para evitar sobrescrever o banco ativo acidentalmente. A cópia original deve ser mantida antes de qualquer restauração.
+A restauração automática do banco ainda deve ser tratada como uma operação separada e explícita. Antes de restaurar, mantenha uma cópia do banco atual.
+
+## Boas práticas
+
+- Faça backup antes de atualizar a aplicação.
+- Faça backup antes de qualquer operação de manutenção.
+- Guarde cópias em outro local.
+- Nunca coloque o arquivo `.db` no Git.
