@@ -81,7 +81,7 @@ export default function Home(){
 
   function notify(msg:string){ setToast(msg); setTimeout(()=>setToast(''),3000) }
 
-  async function registrar(tipo:'ENTRADA'|'SAIDA'){
+  async function registrar(_tipo: 'ENTRADA' | 'SAIDA') {
     const prod = produtos.find(p=>String(p.id)===String(form.produto_id))
     if(!prod) return notify('❌ Selecione um material')
     if(Number(form.quantidade)<=0) return notify('❌ Informe uma quantidade maior que zero')
