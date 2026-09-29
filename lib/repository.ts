@@ -6,8 +6,8 @@ export type Movimentacao = { id:number; produto_id:number; tipo:'ENTRADA'|'SAIDA
 export function listarProdutos(): Produto[] {
   return db.prepare(`
     SELECT p.*, c.nome AS categoria,
-      COALESCE((SELECT SUM(ri.quantidade) FROM reserva_itens ri JOIN reservas r ON r.id=ri.reserva_id WHERE ri.produto_id=p.id AND r.status IN ('SEPARADO','AGUARDANDO_RETIRADA')),0) AS quantidade_reservada,
-      p.quantidade_atual - COALESCE((SELECT SUM(ri.quantidade) FROM reserva_itens ri JOIN reservas r ON r.id=ri.reserva_id WHERE ri.produto_id=p.id AND r.status IN ('SEPARADO','AGUARDANDO_RETIRADA')),0) AS quantidade_disponivel
+      COALESCE((SELECT SUM(ri.quantidade) FROM reserva_itens ri JOIN reservas r ON r.id=ri.reserva_id WHERE ri.produto_id=p.id AND r.status IN ('RESERVADA','SEPARADO','AGUARDANDO_RETIRADA')),0) AS quantidade_reservada,
+      p.quantidade_atual - COALESCE((SELECT SUM(ri.quantidade) FROM reserva_itens ri JOIN reservas r ON r.id=ri.reserva_id WHERE ri.produto_id=p.id AND r.status IN ('RESERVADA','SEPARADO','AGUARDANDO_RETIRADA')),0) AS quantidade_disponivel
     FROM produtos p LEFT JOIN categorias c ON c.id=p.categoria_id
     ORDER BY p.nome
   `).all() as Produto[]
@@ -159,7 +159,7 @@ export function criarReserva(input:ReservaInput) {
 }
 
 export function cancelarReserva(id:number) {
-  const result=db.prepare("UPDATE reservas SET status='CANCELADO' WHERE id=? AND status IN ('SEPARADO','AGUARDANDO_RETIRADA')").run(id)
+  const result=db.prepare("UPDATE reservas SET status='CANCELADO' WHERE id=? AND status IN ('RESERVADA','SEPARADO','AGUARDANDO_RETIRADA')").run(id)
   if (!result.changes) throw new Error('Reserva não encontrada ou já encerrada')
 }
 
