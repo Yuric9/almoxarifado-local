@@ -95,7 +95,7 @@ export function criarRequisicao(input:RequisicaoInput) {
     const numero = `REQ-${new Date().getFullYear()}-${String((db.prepare('SELECT COALESCE(MAX(id),0)+1 AS proximo FROM requisicoes').get() as any).proximo).padStart(6,'0')}`
     const req = db.prepare('INSERT INTO requisicoes (numero,retirado_por,setor,finalidade,entregue_por,observacao) VALUES (?,?,?,?,?,?)').run(numero,nome,input.setor?.trim()||null,input.finalidade?.trim()||null,input.entregue_por?.trim()||null,input.observacao?.trim()||null)
     const requisicaoId = Number(req.lastInsertRowid)
-    const produtoStmt = db.prepare('SELECT id,nome,unidade,quantidade_atual FROM produtos WHERE id=?')
+    const produtoStmt = db.prepare(`SELECT p.id,p.nome,p.unidade,p.quantidade_atual, COALESCE((SELECT SUM(ri.quantidade) FROM reserva_itens ri JOIN reservas r ON r.id=ri.reserva_id WHERE ri.produto_id=p.id AND r.status='RESERVADA'),0) AS reservada FROM produtos p WHERE p.id=?`)
     const update = db.prepare('UPDATE produtos SET quantidade_atual=quantidade_atual-? WHERE id=?')
     const mov = db.prepare('INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao) VALUES (?,?,?,?,?)')
     const item = db.prepare('INSERT INTO requisicao_itens (requisicao_id,produto_id,quantidade,unidade,produto_nome) VALUES (?,?,?,?,?)')
@@ -104,7 +104,8 @@ export function criarRequisicao(input:RequisicaoInput) {
       const produto = produtoStmt.get(entrada.produto_id) as any
       if (!produto) throw new Error('Produto não encontrado')
       if (!Number.isFinite(quantidade) || quantidade <= 0) throw new Error('Quantidade inválida')
-      if (produto.quantidade_atual < quantidade) throw new Error(`Estoque insuficiente para ${produto.nome}. Disponível: ${produto.quantidade_atual}`)
+      const disponivel=produto.quantidade_atual-Number(produto.reservada||0)
+      if (disponivel < quantidade) throw new Error(`Material reservado: ${produto.nome}. Disponível para retirada comum: ${disponivel} ${produto.unidade}.`)
       update.run(quantidade, produto.id)
       item.run(requisicaoId,produto.id,quantidade,produto.unidade,produto.nome)
       mov.run(produto.id,'SAIDA',quantidade,nome,`Requisição ${numero}${input.finalidade ? ' - '+input.finalidade : ''}`)
