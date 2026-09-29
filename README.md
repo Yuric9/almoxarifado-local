@@ -27,3 +27,7 @@ O arquivo `supabase.sql` é preservado como referência do modelo online. Durant
 ## Importante
 
 A branch `feature/app-local` ainda contém a implementação original do MVP. A conversão para SQLite/Electron será feita em etapas, com testes antes de cada marco.
+
+## Requisições de retirada
+
+As retiradas de materiais são registradas como **Requisição de Material / Comprovante de Retirada**, com número automático, pessoa que retirou, setor, finalidade, materiais, quantidades, responsável pela entrega e impressão do comprovante. A baixa do estoque fica vinculada à requisição.
