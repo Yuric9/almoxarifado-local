@@ -64,3 +64,49 @@ export function importarDados(dados: {categorias?: any[]; produtos?: any[]; movi
   })
   tx()
 }
+
+
+export type RequisicaoItemInput = { produto_id:number; quantidade:number }
+export type RequisicaoInput = { retirado_por:string; setor?:string; finalidade?:string; entregue_por?:string; observacao?:string; itens:RequisicaoItemInput[] }
+
+export function listarRequisicoes() {
+  return db.prepare(`
+    SELECT r.*, COUNT(ri.id) AS total_itens
+    FROM requisicoes r LEFT JOIN requisicao_itens ri ON ri.requisicao_id=r.id
+    GROUP BY r.id ORDER BY r.id DESC LIMIT 200
+  `).all() as any[]
+}
+
+export function obterRequisicao(id:number) {
+  const requisicao = db.prepare('SELECT * FROM requisicoes WHERE id=?').get(id) as any
+  if (!requisicao) throw new Error('Requisição não encontrada')
+  const itens = db.prepare(`SELECT ri.*, p.quantidade_atual AS estoque_atual FROM requisicao_itens ri JOIN produtos p ON p.id=ri.produto_id WHERE ri.requisicao_id=? ORDER BY ri.id`).all(id)
+  return { ...requisicao, itens }
+}
+
+export function criarRequisicao(input:RequisicaoInput) {
+  const tx = db.transaction(() => {
+    const nome = input.retirado_por?.trim()
+    if (!nome) throw new Error('Nome de quem retirou é obrigatório')
+    if (!input.itens?.length) throw new Error('Adicione pelo menos um material')
+    const numero = `REQ-${new Date().getFullYear()}-${String((db.prepare('SELECT COALESCE(MAX(id),0)+1 AS proximo FROM requisicoes').get() as any).proximo).padStart(6,'0')}`
+    const req = db.prepare('INSERT INTO requisicoes (numero,retirado_por,setor,finalidade,entregue_por,observacao) VALUES (?,?,?,?,?,?)').run(numero,nome,input.setor?.trim()||null,input.finalidade?.trim()||null,input.entregue_por?.trim()||null,input.observacao?.trim()||null)
+    const requisicaoId = Number(req.lastInsertRowid)
+    const produtoStmt = db.prepare('SELECT id,nome,unidade,quantidade_atual FROM produtos WHERE id=?')
+    const update = db.prepare('UPDATE produtos SET quantidade_atual=quantidade_atual-? WHERE id=?')
+    const mov = db.prepare('INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao) VALUES (?,?,?,?,?)')
+    const item = db.prepare('INSERT INTO requisicao_itens (requisicao_id,produto_id,quantidade,unidade,produto_nome) VALUES (?,?,?,?,?)')
+    for (const entrada of input.itens) {
+      const quantidade = Number(entrada.quantidade)
+      const produto = produtoStmt.get(entrada.produto_id) as any
+      if (!produto) throw new Error('Produto não encontrado')
+      if (!Number.isFinite(quantidade) || quantidade <= 0) throw new Error('Quantidade inválida')
+      if (produto.quantidade_atual < quantidade) throw new Error(`Estoque insuficiente para ${produto.nome}. Disponível: ${produto.quantidade_atual}`)
+      update.run(quantidade, produto.id)
+      item.run(requisicaoId,produto.id,quantidade,produto.unidade,produto.nome)
+      mov.run(produto.id,'SAIDA',quantidade,nome,`Requisição ${numero}${input.finalidade ? ' - '+input.finalidade : ''}`)
+    }
+    return requisicaoId
+  })
+  return tx()
+}
