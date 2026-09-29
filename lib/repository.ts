@@ -253,7 +253,7 @@ export function criarRequisicao(input:RequisicaoInput) {
       'INSERT INTO requisicao_itens (requisicao_id,produto_id,quantidade,unidade,produto_nome) VALUES (?,?,?,?,?)'
     )
 
-    for (const entrada of input.itens) {
+    for (const entrada of consolidarItens(input.itens)) {
       const quantidade = Number(entrada.quantidade)
       const produto = produtoStmt.get(entrada.produto_id) as any
       if (!produto) throw new Error('Produto não encontrado')
@@ -269,6 +269,16 @@ export function criarRequisicao(input:RequisicaoInput) {
     return requisicaoId
   })
   return tx()
+}
+
+function consolidarItens(itens: RequisicaoItemInput[]) {
+  const porProduto = new Map<number, number>()
+  for (const item of itens) {
+    const produtoId=Number(item.produto_id)
+    const quantidade=Number(item.quantidade)
+    porProduto.set(produtoId,(porProduto.get(produtoId) || 0) + quantidade)
+  }
+  return Array.from(porProduto.entries()).map(([produto_id,quantidade])=>({produto_id,quantidade}))
 }
 
 export type ReservaItemInput = { produto_id:number; quantidade:number }
@@ -322,7 +332,7 @@ export function criarReserva(input:ReservaInput) {
       'INSERT INTO reserva_itens (reserva_id,produto_id,quantidade,unidade,produto_nome) VALUES (?,?,?,?,?)'
     )
 
-    for (const entrada of input.itens) {
+    for (const entrada of consolidarItens(input.itens)) {
       const quantidade=Number(entrada.quantidade)
       const produto=produtoStmt.get(entrada.produto_id) as any
       if (!produto) throw new Error('Produto não encontrado')
