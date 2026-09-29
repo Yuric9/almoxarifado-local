@@ -52,6 +52,7 @@ export default function Home(){
       if(!res.ok) throw new Error(data.error||'Não foi possível registrar a retirada')
       const detalhe=await fetch('/api/requisicoes/'+data.id).then(r=>r.json())
       setRequisicaoCriada(detalhe)
+      setShowRequisicao(false)
       setRequisicao({retirado_por:'',setor:'',finalidade:'',entregue_por:'',observacao:'',itens:[{produto_id:'',quantidade:''}]})
       const [p,m]=await Promise.all([fetch('/api/produtos').then(r=>r.json()),fetch('/api/movimentacoes').then(r=>r.json())])
       setProdutos(p);setMovs(m);await carregarRequisicoes();notify('✅ Retirada registrada: '+detalhe.numero)
@@ -155,7 +156,7 @@ export default function Home(){
       </div>}
 
       {requisicaoCriada && <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-[20px] w-full max-w-2xl p-8 print:shadow-none">
+        <div className="print-document bg-white rounded-[20px] w-full max-w-2xl p-8 print:shadow-none">
           <div className="text-center border-b pb-4 mb-5"><h2 className="text-2xl font-black">ALMOXARIFADO LOCAL</h2><p className="font-bold text-lg">COMPROVANTE DE RETIRADA</p><p className="text-zinc-500">{requisicaoCriada.numero}</p></div>
           <div className="grid grid-cols-2 gap-3 text-sm mb-5"><p><b>Retirado por:</b> {requisicaoCriada.retirado_por}</p><p><b>Setor:</b> {requisicaoCriada.setor||'—'}</p><p><b>Data:</b> {new Date(requisicaoCriada.criado_em).toLocaleString('pt-BR')}</p><p><b>Entregue por:</b> {requisicaoCriada.entregue_por||'—'}</p></div>
           <table className="w-full border-collapse mb-5"><thead><tr className="border-b-2 text-left"><th className="py-2">Material</th><th className="py-2">Qtd.</th><th className="py-2">Un.</th></tr></thead><tbody>{requisicaoCriada.itens.map((i:any)=><tr key={i.id} className="border-b"><td className="py-2">{i.produto_nome}</td><td className="py-2">{i.quantidade}</td><td className="py-2">{i.unidade}</td></tr>)}</tbody></table>
