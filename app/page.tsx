@@ -24,6 +24,10 @@ export default function Home(){
   const [form,setForm]=useState<any>({})
   const [toast,setToast]=useState('')
   const [backupStatus,setBackupStatus]=useState('')
+  const [showRequisicao,setShowRequisicao]=useState(false)
+  const [requisicoes,setRequisicoes]=useState<any[]>([])
+  const [requisicao,setRequisicao]=useState<any>({retirado_por:'',setor:'',finalidade:'',entregue_por:'',observacao:'',itens:[{produto_id:'',quantidade:''}]})
+  const [requisicaoCriada,setRequisicaoCriada]=useState<any>(null)
 
   async function fazerBackup(){
     try{
@@ -32,6 +36,29 @@ export default function Home(){
       const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='almoxarifado-backup.db'; a.click(); URL.revokeObjectURL(url); setBackupStatus('Backup gerado com sucesso'); setTimeout(()=>setBackupStatus(''),3000)
     }catch(e){setBackupStatus(e instanceof Error?e.message:'Erro no backup')}
   }
+
+  async function carregarRequisicoes(){ const res=await fetch('/api/requisicoes'); if(res.ok) setRequisicoes(await res.json()) }
+  useEffect(()=>{ carregarRequisicoes() },[])
+
+  function adicionarItemRequisicao(){ setRequisicao((r:any)=>({...r,itens:[...r.itens,{produto_id:'',quantidade:''}]})) }
+  function removerItemRequisicao(index:number){ setRequisicao((r:any)=>({...r,itens:r.itens.filter((_:any,i:number)=>i!==index)})) }
+  function atualizarItemRequisicao(index:number,campo:string,valor:any){ setRequisicao((r:any)=>({...r,itens:r.itens.map((item:any,i:number)=>i===index?{...item,[campo]:valor}:item)})) }
+
+  async function criarRequisicao(){
+    try{
+      const itens=requisicao.itens.filter((i:any)=>i.produto_id && Number(i.quantidade)>0).map((i:any)=>({produto_id:Number(i.produto_id),quantidade:Number(i.quantidade)}))
+      const res=await fetch('/api/requisicoes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...requisicao,itens})})
+      const data=await res.json()
+      if(!res.ok) throw new Error(data.error||'Não foi possível registrar a retirada')
+      const detalhe=await fetch('/api/requisicoes/'+data.id).then(r=>r.json())
+      setRequisicaoCriada(detalhe)
+      setRequisicao({retirado_por:'',setor:'',finalidade:'',entregue_por:'',observacao:'',itens:[{produto_id:'',quantidade:''}]})
+      const [p,m]=await Promise.all([fetch('/api/produtos').then(r=>r.json()),fetch('/api/movimentacoes').then(r=>r.json())])
+      setProdutos(p);setMovs(m);await carregarRequisicoes();notify('✅ Retirada registrada: '+detalhe.numero)
+    }catch(e){notify('❌ '+(e instanceof Error?e.message:'Erro ao registrar retirada'))}
+  }
+
+  function imprimirRequisicao(){ window.print() }
 
   const alerta = produtos.filter(p=>p.quantidade_atual <= p.estoque_minimo)
   const filtrados = produtos.filter(p=> (catFiltro==='Todas' || p.categoria===catFiltro) && p.nome.toLowerCase().includes(busca.toLowerCase()))
@@ -59,7 +86,16 @@ export default function Home(){
         </div>
       </header>
 
-      <div className="flex justify-end mb-4"><button onClick={fazerBackup} className="px-4 py-2 rounded-xl border-2 border-zinc-200 bg-white font-semibold hover:bg-zinc-50">💾 Fazer backup</button></div>
+      <div className="flex flex-wrap justify-end gap-2 mb-4">
+        <button onClick={()=>{setRequisicaoCriada(null);setShowRequisicao(true)}} className="px-4 py-2 rounded-xl bg-orange-600 text-white font-bold">📝 Nova retirada</button>
+        <button onClick={fazerBackup} className="px-4 py-2 rounded-xl border-2 border-zinc-200 bg-white font-semibold hover:bg-zinc-50">💾 Fazer backup</button></div>
+      {requisicoes.length>0 && <div className="mb-6 bg-white rounded-[20px] border p-5">
+        <div className="flex items-center justify-between mb-3"><h3 className="text-xl font-bold">Últimas requisições de retirada</h3><button onClick={()=>setShowRequisicao(true)} className="text-blue-600 font-bold">Nova retirada</button></div>
+        <div className="space-y-2">{requisicoes.slice(0,5).map(r=><div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-b last:border-0 py-3">
+          <div><p className="font-bold">{r.numero} · {r.retirado_por}</p><p className="text-sm text-zinc-500">{r.setor||'Sem setor'} · {new Date(r.criado_em).toLocaleString('pt-BR')} · {r.total_itens} item(ns)</p></div>
+          <button onClick={async()=>setRequisicaoCriada(await fetch('/api/requisicoes/'+r.id).then(x=>x.json()))} className="px-3 py-2 rounded-lg border font-semibold">Ver comprovante</button>
+        </div>)}</div>
+      </div>}
       {backupStatus && <div className="mb-4 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3">{backupStatus}</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -96,6 +132,39 @@ export default function Home(){
 
       {movs.length>0 && <div className="mt-10 bg-white rounded-[20px] p-6 border"><h3 className="text-xl font-bold mb-4">Histórico Recente</h3><div className="space-y-3">{movs.slice(0,8).map(m=><div key={m.id} className="flex gap-3 items-center"><div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${m.tipo==='ENTRADA'?'bg-green-600':'bg-orange-600'}`}>{m.tipo==='ENTRADA'?'↓':'↑'}</div><div><p className="font-semibold">{m.tipo} - {m.produto_nome} - {m.quantidade} UN</p><p className="text-sm text-zinc-500">{m.responsavel} • {new Date(m.criado_em).toLocaleString('pt-BR')}</p></div></div>)}</div></div>}
 
+
+      {showRequisicao && <div className="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-[28px] w-full max-w-3xl p-6 md:p-8 max-h-[92vh] overflow-auto">
+          <div className="flex justify-between items-start gap-4 mb-6"><div><h2 className="text-2xl font-black">📝 Requisição de Material</h2><p className="text-zinc-500">Registre quem retirou e quais materiais foram entregues.</p></div><button onClick={()=>setShowRequisicao(false)} className="text-2xl">×</button></div>
+          <div className="grid md:grid-cols-2 gap-3 mb-5">
+            <input placeholder="Nome de quem retirou *" value={requisicao.retirado_por} onChange={e=>setRequisicao({...requisicao,retirado_por:e.target.value})} className="h-13 border-2 rounded-xl px-4"/>
+            <input placeholder="Setor / departamento" value={requisicao.setor} onChange={e=>setRequisicao({...requisicao,setor:e.target.value})} className="h-13 border-2 rounded-xl px-4"/>
+            <input placeholder="Finalidade da retirada" value={requisicao.finalidade} onChange={e=>setRequisicao({...requisicao,finalidade:e.target.value})} className="h-13 border-2 rounded-xl px-4"/>
+            <input placeholder="Entregue por" value={requisicao.entregue_por} onChange={e=>setRequisicao({...requisicao,entregue_por:e.target.value})} className="h-13 border-2 rounded-xl px-4"/>
+          </div>
+          <h3 className="font-bold text-lg mb-3">Materiais retirados</h3>
+          <div className="space-y-3">{requisicao.itens.map((item:any,index:number)=><div key={index} className="grid grid-cols-[1fr_110px_auto] gap-2">
+            <select value={item.produto_id} onChange={e=>atualizarItemRequisicao(index,'produto_id',e.target.value)} className="h-13 border-2 rounded-xl px-3"><option value="">Selecione o material</option>{produtos.map(p=><option key={p.id} value={p.id}>{p.nome} — disponível: {p.quantidade_atual} {p.unidade}</option>)}</select>
+            <input type="number" min="0.01" placeholder="Qtd." value={item.quantidade} onChange={e=>atualizarItemRequisicao(index,'quantidade',e.target.value)} className="h-13 border-2 rounded-xl px-3"/>
+            <button onClick={()=>removerItemRequisicao(index)} disabled={requisicao.itens.length===1} className="px-3 rounded-xl border text-red-600 disabled:opacity-30">Remover</button>
+          </div>)}</div>
+          <button onClick={adicionarItemRequisicao} className="mt-3 text-blue-600 font-bold">+ Adicionar outro material</button>
+          <textarea placeholder="Observação (opcional)" value={requisicao.observacao} onChange={e=>setRequisicao({...requisicao,observacao:e.target.value})} className="w-full border-2 rounded-xl p-3 mt-5 min-h-20"/>
+          <div className="flex gap-3 mt-5"><button onClick={()=>setShowRequisicao(false)} className="flex-1 h-13 rounded-xl border-2 font-bold">Cancelar</button><button onClick={criarRequisicao} className="flex-1 h-13 rounded-xl bg-orange-600 text-white font-bold">Confirmar retirada</button></div>
+        </div>
+      </div>}
+
+      {requisicaoCriada && <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-[20px] w-full max-w-2xl p-8 print:shadow-none">
+          <div className="text-center border-b pb-4 mb-5"><h2 className="text-2xl font-black">ALMOXARIFADO LOCAL</h2><p className="font-bold text-lg">COMPROVANTE DE RETIRADA</p><p className="text-zinc-500">{requisicaoCriada.numero}</p></div>
+          <div className="grid grid-cols-2 gap-3 text-sm mb-5"><p><b>Retirado por:</b> {requisicaoCriada.retirado_por}</p><p><b>Setor:</b> {requisicaoCriada.setor||'—'}</p><p><b>Data:</b> {new Date(requisicaoCriada.criado_em).toLocaleString('pt-BR')}</p><p><b>Entregue por:</b> {requisicaoCriada.entregue_por||'—'}</p></div>
+          <table className="w-full border-collapse mb-5"><thead><tr className="border-b-2 text-left"><th className="py-2">Material</th><th className="py-2">Qtd.</th><th className="py-2">Un.</th></tr></thead><tbody>{requisicaoCriada.itens.map((i:any)=><tr key={i.id} className="border-b"><td className="py-2">{i.produto_nome}</td><td className="py-2">{i.quantidade}</td><td className="py-2">{i.unidade}</td></tr>)}</tbody></table>
+          {requisicaoCriada.finalidade && <p className="mb-3"><b>Finalidade:</b> {requisicaoCriada.finalidade}</p>}
+          {requisicaoCriada.observacao && <p className="mb-6"><b>Observação:</b> {requisicaoCriada.observacao}</p>}
+          <div className="grid grid-cols-2 gap-10 mt-10 text-center text-sm"><div className="border-t pt-2">Assinatura de quem retirou</div><div className="border-t pt-2">Assinatura do responsável</div></div>
+          <div className="flex gap-3 mt-8 print:hidden"><button onClick={()=>setRequisicaoCriada(null)} className="flex-1 h-12 rounded-xl border-2 font-bold">Fechar</button><button onClick={imprimirRequisicao} className="flex-1 h-12 rounded-xl bg-zinc-900 text-white font-bold">🖨️ Imprimir</button></div>
+        </div>
+      </div>}
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-8 py-4 rounded-full text-lg font-bold shadow-2xl">{toast}</div>}
 
       {(showEntrada||showSaida) && <div className="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center p-4 z-50">
