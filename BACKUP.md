@@ -8,7 +8,7 @@
 | Instalada (NSIS) | `%APPDATA%\Almoxarifado Local\data\` |
 | Desenvolvimento | `./data/` |
 
-O caminho exato aparece no rodapé do programa e na tela **💾 Backup**.
+O caminho exato aparece no rodapé do programa e na tela **Backup**.
 
 ## Backup automático
 
@@ -16,13 +16,13 @@ Ao abrir o programa, é feito **um backup por dia** em `backups/` (`almoxarifado
 
 ## Backup manual
 
-Em **💾 Backup → Fazer backup agora** é criado `almoxarifado-manual-….db` na pasta `backups/`. Com **Salvar cópia…** você grava qualquer backup em outro lugar (pendrive, nuvem, outro disco).
+No menu **Backup → Fazer backup agora** é criado `almoxarifado-manual-….db` na pasta `backups/`. Com **Salvar cópia** você grava qualquer backup em outro lugar (pendrive, nuvem, outro disco).
 
 Os backups são gerados com `VACUUM INTO`, que produz uma cópia consistente mesmo com o programa em uso.
 
 ## Restauração
 
-Em **💾 Backup → Restaurar um backup**, escolha um arquivo `.db` e confirme.
+No menu **Backup → Restaurar backup**, escolha um arquivo `.db` e confirme.
 
 1. O arquivo é validado (integridade do SQLite e tabelas do Almoxarifado).
 2. Os dados atuais são salvos em `almoxarifado-antes-da-restauracao-….db`.

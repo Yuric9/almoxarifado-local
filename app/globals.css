@@ -2,11 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-* { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
+html { font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif; }
+body { -webkit-font-smoothing: antialiased; }
 
 @media print {
   body * { visibility: hidden; }
   .print-overlay { position: static !important; background: none !important; padding: 0 !important; }
   .print-document, .print-document * { visibility: visible; }
-  .print-document { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; max-width: none !important; box-shadow: none !important; border-radius: 0 !important; }
+  .print-document { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; max-width: none !important; box-shadow: none !important; padding: 0 !important; }
+  @page { size: A4; margin: 15mm; }
 }
