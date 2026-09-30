@@ -86,7 +86,7 @@ tests/                   testes automatizados
 
 O workflow `.github/workflows/ci.yml` roda lint, tipos, testes e build a cada push ou PR. Depois gera os pacotes Windows e publica como artefato, com `SHA256SUMS.txt`.
 
-Para publicar uma versão na página Releases, crie e envie uma tag (ex.: `git tag v1.2.0 && git push origin v1.2.0`). O CI anexa os executáveis à Release automaticamente. Lembre de atualizar o campo `version` do `package.json` antes.
+Ao mesclar na `main`, o CI cria automaticamente a Release `v<versão do package.json>` com os executáveis. Para lançar uma nova versão, aumente o campo `version` do `package.json` no PR. Enviar uma tag `v*` também publica uma Release.
 
 ## Mais documentação
 
