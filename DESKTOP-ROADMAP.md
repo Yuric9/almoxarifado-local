@@ -11,9 +11,9 @@
 - [x] Estrutura Electron inicial
 - [x] Ajustar execução do servidor Next no processo desktop
 - [x] Definir diretório persistente de dados via Electron
-- [ ] Empacotar aplicação Windows
-- [ ] Criar instalador NSIS
-- [ ] Criar modo portátil
+- [x] Configurar empacotamento Windows x64
+- [x] Configurar instalador NSIS
+- [x] Configurar modo portátil
 - [ ] Testar instalação/atualização sem perda do banco
 
 ## Etapa 3 — Operação
