@@ -16,7 +16,7 @@ Feito com Next.js 14, React 18, Tailwind CSS, SQLite (`better-sqlite3`) e Electr
 
 ## Uso no HD externo (modo portátil)
 
-1. Baixe `Almoxarifado-Local-HD-<versão>.zip` (artefato do GitHub Actions).
+1. Baixe `Almoxarifado-Local-HD-<versão>.zip` na página [Releases](https://github.com/Yuric9/almoxarifado-local/releases) do repositório.
 2. Extraia a pasta inteira no HD, por exemplo `E:\Almoxarifado\`.
 3. Abra `Almoxarifado Local.exe`.
 
@@ -85,6 +85,8 @@ tests/                   testes automatizados
 ## CI
 
 O workflow `.github/workflows/ci.yml` roda lint, tipos, testes e build a cada push ou PR. Depois gera os pacotes Windows e publica como artefato, com `SHA256SUMS.txt`.
+
+Para publicar uma versão na página Releases, crie e envie uma tag (ex.: `git tag v1.2.0 && git push origin v1.2.0`). O CI anexa os executáveis à Release automaticamente. Lembre de atualizar o campo `version` do `package.json` antes.
 
 ## Mais documentação
 

@@ -56,3 +56,36 @@ jobs:
             release/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    name: Publicar Release
+    needs: windows
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: almoxarifado-windows-x64
+          path: release
+      - name: Criar Release com os executáveis
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Almoxarifado Local ${{ github.ref_name }}
+          body: |
+            ## Downloads
+
+            | Arquivo | Uso |
+            | --- | --- |
+            | `Almoxarifado-Local-HD-*.zip` | **Recomendado para HD externo.** Extraia a pasta inteira no HD e abra `Almoxarifado Local.exe`. Os dados ficam em `Almoxarifado-Dados` ao lado do programa. |
+            | `Almoxarifado-Local-Portable-*.exe` | Arquivo único portátil (abre mais devagar). |
+            | `Almoxarifado-Local-Setup-*.exe` | Instalador para o computador. |
+            | `SHA256SUMS.txt` | Códigos para conferir os arquivos. |
+
+            O Windows pode exibir "O Windows protegeu o computador" porque o executável não tem assinatura digital: clique em **Mais informações → Executar assim mesmo**.
+          files: |
+            release/*.exe
+            release/*.zip
+            release/SHA256SUMS.txt
+          fail_on_unmatched_files: true
