@@ -1,9 +1,45 @@
-import { NextResponse } from 'next/server'
+import { falha, idDaRota, lerJson, ok } from '@/lib/api'
 import { atualizarStatusReserva, cancelarReserva, obterReserva, retirarReserva } from '@/lib/repository'
-export const runtime='nodejs'
-export async function GET(_req:Request,{params}:{params:{id:string}}){ try{return NextResponse.json(obterReserva(Number(params.id)))}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Erro'},{status:404})} }
-export async function DELETE(_req:Request,{params}:{params:{id:string}}){ try{cancelarReserva(Number(params.id));return NextResponse.json({ok:true})}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Erro'},{status:400})} }
 
-export async function POST(req:Request,{params}:{params:{id:string}}){ try{ const body=await req.json(); const requisicaoId=retirarReserva(Number(params.id),body.retirado_por); return NextResponse.json({ok:true,requisicao_id:requisicaoId}) }catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Erro'},{status:400})} }
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
-export async function PATCH(req:Request,{params}:{params:{id:string}}){ try{const body=await req.json(); atualizarStatusReserva(Number(params.id),body.status); return NextResponse.json({ok:true})}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Erro'},{status:400})} }
+type Contexto = { params: { id: string } }
+
+export function GET(_req: Request, { params }: Contexto) {
+  try {
+    return ok(obterReserva(idDaRota(params.id)))
+  } catch (e) {
+    return falha(e, 404)
+  }
+}
+
+/** Retira o pedido reservado: baixa o estoque e gera uma requisição. */
+export async function POST(req: Request, { params }: Contexto) {
+  try {
+    const body = await lerJson(req)
+    const requisicaoId = retirarReserva(idDaRota(params.id), body.retirado_por)
+    return ok({ ok: true, requisicao_id: requisicaoId })
+  } catch (e) {
+    return falha(e)
+  }
+}
+
+export async function PATCH(req: Request, { params }: Contexto) {
+  try {
+    const body = await lerJson(req)
+    atualizarStatusReserva(idDaRota(params.id), body.status)
+    return ok({ ok: true })
+  } catch (e) {
+    return falha(e)
+  }
+}
+
+export function DELETE(_req: Request, { params }: Contexto) {
+  try {
+    cancelarReserva(idDaRota(params.id))
+    return ok({ ok: true })
+  } catch (e) {
+    return falha(e)
+  }
+}
