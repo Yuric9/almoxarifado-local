@@ -10,7 +10,8 @@
     "desktop:dev": "concurrently -k \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
     "desktop:build": "next build",
     "desktop:package": "npm run build && electron-builder",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "desktop:package:win": "npm run build && electron-builder --win nsis portable"
   },
   "dependencies": {
     "next": "14.2.5",
@@ -69,10 +70,11 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "Almoxarifado-Local-Setup-${version}.exe"
     },
     "portable": {
-      "artifactName": "Almoxarifado-Local-Portable.exe"
+      "artifactName": "Almoxarifado-Local-Portable-${version}.exe"
     },
     "npmRebuild": true
   }
