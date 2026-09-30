@@ -1,12 +1,12 @@
 import { falha, lerJson, ok } from '@/lib/api'
-import { criarRequisicao, listarRequisicoes, type ItemInput } from '@/lib/repository'
+import { criarReserva, listarReservas, type ItemInput } from '@/lib/repository'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export function GET() {
   try {
-    return ok(listarRequisicoes())
+    return ok(listarReservas())
   } catch (e) {
     return falha(e, 500)
   }
@@ -15,11 +15,9 @@ export function GET() {
 export async function POST(req: Request) {
   try {
     const body = await lerJson(req)
-    const id = criarRequisicao({
-      retirado_por: body.retirado_por,
-      setor: body.setor,
+    const id = criarReserva({
       finalidade: body.finalidade,
-      entregue_por: body.entregue_por,
+      reservado_por: body.reservado_por,
       observacao: body.observacao,
       itens: Array.isArray(body.itens) ? (body.itens as ItemInput[]) : []
     })

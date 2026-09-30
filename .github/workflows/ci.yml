@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'feature/**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verificar:
+    name: Lint, tipos, testes e build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  windows:
+    name: Pacotes Windows x64
+    needs: verificar
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Empacotar (instalador, portátil e ZIP para HD)
+        run: npm run desktop:package:win
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Gerar SHA256SUMS
+        shell: pwsh
+        run: |
+          Get-ChildItem release -File | Where-Object { $_.Extension -in '.exe', '.zip' } |
+            ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name } |
+            Set-Content release/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: almoxarifado-windows-x64
+          path: |
+            release/*.exe
+            release/*.zip
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publicar Release
+    needs: windows
+    # Roda ao mesclar na main (versão lida do package.json) ou ao enviar uma tag v*.
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
+      - name: Definir versão
+        id: versao
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          name: almoxarifado-windows-x64
+          path: release
+      - name: Criar Release com os executáveis
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.versao.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Almoxarifado Local ${{ steps.versao.outputs.tag }}
+          make_latest: true
+          body: |
+            ## Downloads
+
+            | Arquivo | Uso |
+            | --- | --- |
+            | `Almoxarifado-Local-HD-*.zip` | **Recomendado para HD externo.** Extraia a pasta inteira no HD e abra `Almoxarifado Local.exe`. Os dados ficam em `Almoxarifado-Dados` ao lado do programa. |
+            | `Almoxarifado-Local-Portable-*.exe` | Arquivo único portátil (abre mais devagar). |
+            | `Almoxarifado-Local-Setup-*.exe` | Instalador para o computador. |
+            | `SHA256SUMS.txt` | Códigos para conferir os arquivos. |
+
+            O Windows pode exibir "O Windows protegeu o computador" porque o executável não tem assinatura digital: clique em **Mais informações → Executar assim mesmo**.
+          files: |
+            release/*.exe
+            release/*.zip
+            release/SHA256SUMS.txt
+          fail_on_unmatched_files: true

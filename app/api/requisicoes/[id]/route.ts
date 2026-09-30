@@ -1,12 +1,13 @@
-import { NextResponse } from 'next/server'
+import { falha, idDaRota, ok } from '@/lib/api'
 import { obterRequisicao } from '@/lib/repository'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
-export async function GET(_:Request, { params }: { params:{ id:string } }) {
+export function GET(_req: Request, { params }: { params: { id: string } }) {
   try {
-    return NextResponse.json(obterRequisicao(Number(params.id)))
+    return ok(obterRequisicao(idDaRota(params.id)))
   } catch (e) {
-    return NextResponse.json({ error:e instanceof Error ? e.message : 'Não encontrada' }, { status:404 })
+    return falha(e, 404)
   }
 }
