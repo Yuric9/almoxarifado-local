@@ -1,59 +1,93 @@
 # Almoxarifado Local
 
-Projeto em transformação de um MVP web de almoxarifado para um aplicativo **local, offline e portátil para Windows**.
+Controle de estoque **offline e portátil** para Windows. Funciona direto de um HD externo ou pendrive: o programa e os dados ficam juntos, sem instalar nada no computador e sem internet.
 
-## Estado atual
+Feito com Next.js 14, React 18, Tailwind CSS, SQLite (`better-sqlite3`) e Electron.
 
-O conteúdo original do MVP foi versionado na branch `feature/app-local` como ponto de partida.
+## Funcionalidades
 
-### MVP original
-- Next.js 14
-- React 18
-- Tailwind CSS
-- Supabase (referência da versão online)
+- **Materiais** com categoria, unidade (UN, KG, CX, L…) e alerta de estoque mínimo.
+- **Entrada rápida**: material, quantidade e observação.
+- **Requisição de retirada** com número automático (`REQ-2026-000001`) e **comprovante para imprimir** com campos de assinatura.
+- **Reservas / pedidos separados**: bloqueiam a quantidade sem baixar o estoque físico. Ciclo: `SEPARADO → AGUARDANDO_RETIRADA → RETIRADO` (ou `CANCELADO`).
+- Diferencia **estoque físico**, **reservado** e **disponível**. Uma retirada comum nunca consome material reservado.
+- **Auditoria**: toda movimentação registra a origem (`ESTOQUE_INICIAL`, `ENTRADA_MANUAL`, `REQUISICAO`, `RESERVA`) e o vínculo com a requisição.
+- **Backup automático diário**, backup manual e **restauração** pela própria tela.
 
-### Objetivo da transformação
-- SQLite como banco local
-- Funcionamento sem internet
-- Aplicativo Windows instalável
-- Versão portátil
-- Backup e restauração
-- Interface simples para uso diário
+## Uso no HD externo (modo portátil)
 
-## Versão online futura
+1. Baixe `Almoxarifado-Local-HD-<versão>.zip` (artefato do GitHub Actions).
+2. Extraia a pasta inteira no HD, por exemplo `E:\Almoxarifado\`.
+3. Abra `Almoxarifado Local.exe`.
 
-O arquivo `supabase.sql` é preservado como referência do modelo online. Durante a migração para o modo local será criado `ONLINE-MIGRATION.md`, documentando a arquitetura e os passos necessários para retomar uma versão com Supabase no futuro.
+Na primeira execução é criada a pasta de dados ao lado do programa:
 
-## Importante
+```
+E:\Almoxarifado\
+├── Almoxarifado Local.exe
+├── ... (arquivos do programa)
+└── Almoxarifado-Dados\
+    ├── almoxarifado.db      ← banco de dados
+    ├── backups\             ← backups automáticos e manuais
+    └── logs\servidor.log    ← log para diagnóstico
+```
 
-A branch `feature/app-local` concentra a conversão para SQLite/Electron em etapas. A `main` permanece estável até a validação do aplicativo desktop em Windows.
+- Pode levar o HD para outro computador: os dados vão junto, mesmo se a letra da unidade mudar.
+- O rodapé do programa mostra o modo (portátil/instalado) e onde os dados estão.
+- **Feche o programa antes de desconectar o HD.** O banco usa gravação síncrona e arquivo único para reduzir riscos, mas remover o HD com o programa aberto pode perder a última operação.
+- Também existe `Almoxarifado-Local-Portable-<versão>.exe` (arquivo único). Ele funciona igual, mas demora mais para abrir, porque se descompacta a cada execução. Para o HD, prefira o ZIP.
+- A versão instalada (`Almoxarifado-Local-Setup-<versão>.exe`) guarda os dados em `%APPDATA%\Almoxarifado Local\data`.
 
-## Requisições de retirada
+## Desenvolvimento
 
-As retiradas de materiais são registradas como **Requisição de Material / Comprovante de Retirada**, com número automático, pessoa que retirou, setor, finalidade, materiais, quantidades, responsável pela entrega e impressão do comprovante. A baixa do estoque fica vinculada à requisição.
+Requisitos: Node.js 20 ou superior (o CI usa a versão do `.nvmrc`).
 
-## Operação de estoque
+```bash
+npm install
+npm run dev            # http://127.0.0.1:3000 (dados em ./data)
+npm run desktop:dev    # mesma coisa, dentro da janela do Electron
+```
 
-### Entrada rápida
-A entrada de material é propositalmente simples: material, quantidade e observação opcional. Não exige fornecedor, nota fiscal ou dados de empresa.
+| Comando | O que faz |
+| --- | --- |
+| `npm run lint` | ESLint (regras do Next.js) |
+| `npm run typecheck` | Verificação de tipos do TypeScript |
+| `npm test` | Testes das regras de estoque, reservas, migração e backup (Vitest) |
+| `npm run check` | Os três acima |
+| `npm run build` | Build de produção do Next.js |
+| `npm run desktop:package:win` | Gera instalador, `.exe` portátil e ZIP em `release/` (rodar no Windows) |
+| `npm run rebuild:node` | Recompila o SQLite para o Node após empacotar (ver abaixo) |
 
-### Requisição / retirada
-Toda saída comum deve nascer de uma **Requisição de Material / Comprovante de Retirada**. A baixa do estoque fica vinculada à requisição e a movimentação registra sua origem.
+> O empacotamento recompila o `better-sqlite3` para o Electron dentro do `node_modules`. Depois de empacotar localmente, rode `npm run rebuild:node` antes de voltar a usar `npm run dev` ou `npm test`.
 
-### Reservas / pedidos separados
-Um pedido pode reservar materiais sem baixar o estoque físico. O ciclo é:
-1. **SEPARADO** — quantidade bloqueada para aquele pedido.
-2. **AGUARDANDO_RETIRADA** — pedido pronto e aguardando a pessoa.
-3. **RETIRADO** — retirada concluída; estoque físico é baixado e uma requisição é criada.
-4. **CANCELADO** — reserva liberada e quantidade volta a ficar disponível.
+### Estrutura
 
-O sistema diferencia **estoque físico**, **quantidade reservada** e **quantidade disponível**. Uma retirada comum não pode consumir material que esteja reservado.
+```
+app/
+  page.tsx               tela principal
+  api/                   rotas locais (produtos, movimentacoes, requisicoes, reservas, backup, sistema)
+components/              modais, formulários e comprovante
+lib/
+  db.ts                  conexão SQLite (aberta sob demanda) e migrações
+  repository.ts          regras de negócio (única camada que acessa o banco)
+  backup.ts              backup, backup automático e restauração
+  paths.ts               onde ficam banco e backups
+electron/main.cjs        janela desktop, servidor interno e escolha da pasta de dados
+tests/                   testes automatizados
+```
 
-### Auditoria
-Movimentações guardam a origem (`ENTRADA_MANUAL`, `ESTOQUE_INICIAL`, `REQUISICAO` ou `RESERVA`) e, quando aplicável, o vínculo com a requisição.
+### Segurança
 
-### Migração de bancos antigos
-Ao abrir um banco local antigo, a aplicação converte automaticamente os status legados de reserva:
-- `RESERVADA` → `SEPARADO`
-- `RETIRADA` → `RETIRADO`
-- `CANCELADA` → `CANCELADO`
+- O servidor interno escuta só em `127.0.0.1`, em uma porta livre escolhida a cada execução. Não fica acessível pela rede.
+- Requisições de escrita vindas de outros sites são bloqueadas (`middleware.ts`).
+- A janela usa `contextIsolation` e `sandbox`, e links externos abrem no navegador padrão.
+
+## CI
+
+O workflow `.github/workflows/ci.yml` roda lint, tipos, testes e build a cada push ou PR. Depois gera os pacotes Windows e publica como artefato, com `SHA256SUMS.txt`.
+
+## Mais documentação
+
+- [BACKUP.md](BACKUP.md): backup e restauração
+- [DESKTOP-ROADMAP.md](DESKTOP-ROADMAP.md): próximos passos
+- [ONLINE-MIGRATION.md](ONLINE-MIGRATION.md): como retomar uma versão online (Supabase)

@@ -2,6 +2,8 @@
 
 O projeto local usa SQLite, mas o modelo de dados mantém as mesmas entidades principais da versão Supabase: `categorias`, `produtos` e `movimentacoes`.
 
+A versão local acrescentou `requisicoes`, `requisicao_itens`, `reservas` e `reserva_itens`, além das colunas `movimentacoes.origem` e `movimentacoes.requisicao_id`. O schema completo está em `lib/db.ts`. O `supabase.sql` precisará ser atualizado com essas tabelas antes da retomada online.
+
 ## Estratégia futura
 
 1. Manter o SQLite como fonte local enquanto a sincronização não for implementada.
