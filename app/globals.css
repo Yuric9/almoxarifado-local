@@ -1,10 +1,12 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-* { font-family: Inter, system-ui, sans-serif; }
+
+* { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
 
 @media print {
   body * { visibility: hidden; }
+  .print-overlay { position: static !important; background: none !important; padding: 0 !important; }
   .print-document, .print-document * { visibility: visible; }
-  .print-document { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; max-width: none !important; box-shadow: none !important; }
+  .print-document { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; max-width: none !important; box-shadow: none !important; border-radius: 0 !important; }
 }

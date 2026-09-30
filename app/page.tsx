@@ -1,225 +1,276 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { api, ehHoje, formatarData, formatarQtd, mensagemErro } from '@/lib/cliente'
+import type { Categoria, Movimentacao, Produto, RequisicaoDetalhe, RequisicaoResumo, ReservaResumo, Sistema } from '@/lib/tipos'
+import { BackupModal } from '@/components/BackupModal'
+import { Comprovante } from '@/components/Comprovante'
+import { EntradaModal, NovoProdutoModal, RequisicaoModal, ReservaModal, RetirarReservaModal } from '@/components/Formularios'
 
-type Produto = { id:string, nome:string, categoria_id?:string, quantidade_atual:number, estoque_minimo:number, unidade:string, categoria?:string, quantidade_reservada:number, quantidade_disponivel:number }
-type Mov = { id:string, produto_id:string, tipo:'ENTRADA'|'SAIDA', quantidade:number, responsavel?:string, observacao?:string, criado_em:string, produto_nome?:string }
+type Janela = 'entrada' | 'novo' | 'requisicao' | 'reserva' | 'backup' | null
 
-const CATS = ['Ferramentas','Elétrica','Hidráulica','Limpeza','Geral']
+const ROTULO_STATUS: Record<string, string> = { SEPARADO: 'SEPARADO', AGUARDANDO_RETIRADA: 'AGUARDANDO RETIRADA' }
 
-export default function Home(){
-  const [produtos,setProdutos]=useState<Produto[]>([])
-  const [movs,setMovs]=useState<Mov[]>([])
-  const [carregando,setCarregando]=useState(true)
+export default function Home() {
+  const [produtos, setProdutos] = useState<Produto[]>([])
+  const [categorias, setCategorias] = useState<Categoria[]>([])
+  const [movs, setMovs] = useState<Movimentacao[]>([])
+  const [requisicoes, setRequisicoes] = useState<RequisicaoResumo[]>([])
+  const [reservas, setReservas] = useState<ReservaResumo[]>([])
+  const [sistema, setSistema] = useState<Sistema | null>(null)
+  const [carregando, setCarregando] = useState(true)
+  const [erroCarga, setErroCarga] = useState('')
 
-  useEffect(()=>{
-    Promise.all([fetch('/api/produtos').then(r=>r.json()),fetch('/api/movimentacoes').then(r=>r.json())])
-      .then(([p,m])=>{setProdutos(p);setMovs(m)})
-      .finally(()=>setCarregando(false))
-  },[])
-  const [busca,setBusca]=useState('')
-  const [catFiltro,setCatFiltro]=useState('Todas')
-  const [showEntrada,setShowEntrada]=useState(false)
-  const [showNovo,setShowNovo]=useState(false)
-  const [showReserva,setShowReserva]=useState(false)
-  const [reservas,setReservas]=useState<any[]>([])
-  const [reserva,setReserva]=useState<any>({finalidade:'',reservado_por:'',observacao:'',itens:[{produto_id:'',quantidade:''}]})
-  const [form,setForm]=useState<any>({})
-  const [toast,setToast]=useState('')
-  const [backupStatus,setBackupStatus]=useState('')
-  const [showRequisicao,setShowRequisicao]=useState(false)
-  const [requisicoes,setRequisicoes]=useState<any[]>([])
-  const [requisicao,setRequisicao]=useState<any>({retirado_por:'',setor:'',finalidade:'',entregue_por:'',observacao:'',itens:[{produto_id:'',quantidade:''}]})
-  const [requisicaoCriada,setRequisicaoCriada]=useState<any>(null)
+  const [busca, setBusca] = useState('')
+  const [catFiltro, setCatFiltro] = useState('Todas')
+  const [janela, setJanela] = useState<Janela>(null)
+  const [retirando, setRetirando] = useState<ReservaResumo | null>(null)
+  const [comprovante, setComprovante] = useState<RequisicaoDetalhe | null>(null)
+  const [toast, setToast] = useState('')
 
-  async function fazerBackup(){
-    try{
-      const res=await fetch('/api/backup')
-      if(!res.ok) throw new Error('Não foi possível gerar o backup')
-      const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='almoxarifado-backup.db'; a.click(); URL.revokeObjectURL(url); setBackupStatus('Backup gerado com sucesso'); setTimeout(()=>setBackupStatus(''),3000)
-    }catch(e){setBackupStatus(e instanceof Error?e.message:'Erro no backup')}
-  }
+  const notificar = useCallback((msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(''), 3500)
+  }, [])
 
-  async function carregarRequisicoes(){ const res=await fetch('/api/requisicoes'); if(res.ok) setRequisicoes(await res.json()) }
-  useEffect(()=>{ carregarRequisicoes(); carregarReservas() },[])
-  async function carregarReservas(){ const res=await fetch('/api/reservas'); if(res.ok) setReservas(await res.json()) }
-  function adicionarItemReserva(){ setReserva((r:any)=>({...r,itens:[...r.itens,{produto_id:'',quantidade:''}]})) }
-  function removerItemReserva(index:number){ setReserva((r:any)=>({...r,itens:r.itens.filter((_:any,i:number)=>i!==index)})) }
-  function atualizarItemReserva(index:number,campo:string,valor:any){ setReserva((r:any)=>({...r,itens:r.itens.map((item:any,i:number)=>i===index?{...item,[campo]:valor}:item)})) }
-  async function criarReserva(){
-    try{
-      const itens=reserva.itens.filter((i:any)=>i.produto_id&&Number(i.quantidade)>0).map((i:any)=>({produto_id:Number(i.produto_id),quantidade:Number(i.quantidade)}))
-      const res=await fetch('/api/reservas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...reserva,itens})})
-      const data=await res.json(); if(!res.ok) throw new Error(data.error||'Não foi possível reservar')
-      setShowReserva(false); setReserva({finalidade:'',reservado_por:'',observacao:'',itens:[{produto_id:'',quantidade:''}]}); await carregarReservas(); setProdutos(await fetch('/api/produtos').then(r=>r.json())); notify('✅ Pedido separado e reservado: '+data.id)
-    }catch(e){notify('❌ '+(e instanceof Error?e.message:'Erro ao reservar'))}
-  }
-  async function cancelarReserva(id:number){ try{ const res=await fetch('/api/reservas/'+id,{method:'DELETE'}); const data=await res.json(); if(!res.ok) throw new Error(data.error||'Erro'); await carregarReservas(); setProdutos(await fetch('/api/produtos').then(r=>r.json())); notify('✅ Reserva liberada')}catch(e){notify('❌ '+(e instanceof Error?e.message:'Erro'))} }
-
-  function adicionarItemRequisicao(){ setRequisicao((r:any)=>({...r,itens:[...r.itens,{produto_id:'',quantidade:''}]})) }
-  function removerItemRequisicao(index:number){ setRequisicao((r:any)=>({...r,itens:r.itens.filter((_:any,i:number)=>i!==index)})) }
-  function atualizarItemRequisicao(index:number,campo:string,valor:any){ setRequisicao((r:any)=>({...r,itens:r.itens.map((item:any,i:number)=>i===index?{...item,[campo]:valor}:item)})) }
-
-  async function criarRequisicao(){
-    try{
-      const itens=requisicao.itens.filter((i:any)=>i.produto_id && Number(i.quantidade)>0).map((i:any)=>({produto_id:Number(i.produto_id),quantidade:Number(i.quantidade)}))
-      const res=await fetch('/api/requisicoes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...requisicao,itens})})
-      const data=await res.json()
-      if(!res.ok) throw new Error(data.error||'Não foi possível registrar a retirada')
-      const detalhe=await fetch('/api/requisicoes/'+data.id).then(r=>r.json())
-      setRequisicaoCriada(detalhe)
-      setShowRequisicao(false)
-      setRequisicao({retirado_por:'',setor:'',finalidade:'',entregue_por:'',observacao:'',itens:[{produto_id:'',quantidade:''}]})
-      const [p,m]=await Promise.all([fetch('/api/produtos').then(r=>r.json()),fetch('/api/movimentacoes').then(r=>r.json())])
-      setProdutos(p);setMovs(m);await carregarRequisicoes();notify('✅ Retirada registrada: '+detalhe.numero)
-    }catch(e){notify('❌ '+(e instanceof Error?e.message:'Erro ao registrar retirada'))}
-  }
-
-  function imprimirRequisicao(){ window.print() }
-
-  const alerta = produtos.filter(p=>p.quantidade_atual <= p.estoque_minimo)
-  const filtrados = produtos.filter(p=> (catFiltro==='Todas' || p.categoria===catFiltro) && p.nome.toLowerCase().includes(busca.toLowerCase()))
-
-  function notify(msg:string){ setToast(msg); setTimeout(()=>setToast(''),3000) }
-
-  async function registrar() {
-    const prod = produtos.find(p=>String(p.id)===String(form.produto_id))
-    if(!prod) return notify('❌ Selecione um material')
-    if(Number(form.quantidade)<=0) return notify('❌ Informe uma quantidade maior que zero')
+  const recarregar = useCallback(async () => {
     try {
-      const res=await fetch('/api/movimentacoes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({produto_id:Number(form.produto_id),tipo:'ENTRADA',quantidade:Number(form.quantidade),observacao:form.observacao})})
-      const data=await res.json()
-      if(!res.ok) throw new Error(data.error||'Não foi possível registrar')
-      const [p,m]=await Promise.all([fetch('/api/produtos').then(r=>r.json()),fetch('/api/movimentacoes').then(r=>r.json())])
-      setProdutos(p);setMovs(m);notify('✅ Entrada registrada');setShowEntrada(false);setForm({})
-    } catch(e){ notify('❌ '+(e instanceof Error?e.message:'Erro ao registrar')) }
+      const [p, m, r, s, c] = await Promise.all([
+        api<Produto[]>('/api/produtos'),
+        api<Movimentacao[]>('/api/movimentacoes'),
+        api<RequisicaoResumo[]>('/api/requisicoes'),
+        api<ReservaResumo[]>('/api/reservas'),
+        api<Categoria[]>('/api/categorias')
+      ])
+      setProdutos(p); setMovs(m); setRequisicoes(r); setReservas(s); setCategorias(c)
+      setErroCarga('')
+    } catch (e) {
+      setErroCarga(mensagemErro(e))
+    } finally {
+      setCarregando(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    recarregar()
+    api<Sistema>('/api/sistema').then(setSistema).catch(() => {})
+  }, [recarregar])
+
+  const fechar = useCallback(() => setJanela(null), [])
+
+  async function concluir(msg: string) {
+    setJanela(null)
+    await recarregar()
+    notificar(msg)
   }
+
+  async function abrirComprovante(id: number) {
+    try {
+      setComprovante(await api<RequisicaoDetalhe>(`/api/requisicoes/${id}`))
+    } catch (e) {
+      notificar('❌ ' + mensagemErro(e))
+    }
+  }
+
+  async function acaoReserva(r: ReservaResumo, acao: 'aguardar' | 'liberar') {
+    try {
+      if (acao === 'liberar') {
+        if (!window.confirm(`Liberar a reserva ${r.numero}? Os materiais voltam a ficar disponíveis.`)) return
+        await api(`/api/reservas/${r.id}`, { method: 'DELETE' })
+        notificar('✅ Reserva liberada')
+      } else {
+        await api(`/api/reservas/${r.id}`, { method: 'PATCH', json: { status: 'AGUARDANDO_RETIRADA' } })
+        notificar('📦 Pedido aguardando retirada')
+      }
+      await recarregar()
+    } catch (e) {
+      notificar('❌ ' + mensagemErro(e))
+    }
+  }
+
+  const alerta = useMemo(() => produtos.filter(p => p.quantidade_atual <= p.estoque_minimo), [produtos])
+  const reservasAtivas = useMemo(() => reservas.filter(r => r.status === 'SEPARADO' || r.status === 'AGUARDANDO_RETIRADA'), [reservas])
+  const filtrados = useMemo(() => {
+    const termo = busca.trim().toLocaleLowerCase('pt-BR')
+    return produtos.filter(p =>
+      (catFiltro === 'Todas' || p.categoria === catFiltro) &&
+      p.nome.toLocaleLowerCase('pt-BR').includes(termo)
+    )
+  }, [produtos, busca, catFiltro])
 
   return (
-    <div className="min-h-screen max-w-6xl mx-auto p-4 md:p-8">
-      <header className="flex flex-col md:flex-row justify-between gap-4 mb-8">
-        <div><h1 className="text-3xl font-black tracking-tight">Almoxarifado Simples</h1><p className="text-zinc-500 text-lg">Fácil para qualquer idade usar</p></div>
-        <div className="relative flex-1 max-w-md">
-          <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="🔍 Buscar material... ex: parafuso" className="w-full h-14 rounded-2xl border-2 border-zinc-200 px-6 text-lg focus:border-blue-500 outline-none"/>
+    <div className="mx-auto min-h-screen max-w-6xl p-4 md:p-8">
+      <header className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight">Almoxarifado Local</h1>
+          <p className="text-lg text-zinc-500">Controle de estoque simples e offline</p>
+        </div>
+        <div className="flex flex-1 items-center gap-2 md:max-w-lg">
+          <input type="search" value={busca} onChange={e => setBusca(e.target.value)} placeholder="🔍 Buscar material… ex: parafuso" aria-label="Buscar material" className="h-14 w-full rounded-2xl border-2 border-zinc-200 px-6 text-lg outline-none focus:border-blue-500" />
+          <button onClick={() => setJanela('backup')} className="h-14 shrink-0 rounded-2xl border-2 border-zinc-200 bg-white px-4 font-semibold hover:bg-zinc-50" title="Backup e restauração">💾 Backup</button>
         </div>
       </header>
 
-      <div className="flex flex-wrap justify-end gap-2 mb-4">
-        <button onClick={()=>{setRequisicaoCriada(null);setShowRequisicao(true)}} className="px-4 py-2 rounded-xl bg-orange-600 text-white font-bold">📝 Nova retirada</button>
-        <button onClick={()=>setShowReserva(true)} className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold">📦 Separar pedido</button>
-        <button onClick={fazerBackup} className="px-4 py-2 rounded-xl border-2 border-zinc-200 bg-white font-semibold hover:bg-zinc-50">💾 Fazer backup</button></div>
-      {requisicoes.length>0 && <div className="mb-6 bg-white rounded-[20px] border p-5">
-        <div className="flex items-center justify-between mb-3"><h3 className="text-xl font-bold">Últimas requisições de retirada</h3><button onClick={()=>setShowRequisicao(true)} className="text-blue-600 font-bold">Nova retirada</button></div>
-        <div className="space-y-2">{requisicoes.slice(0,5).map(r=><div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-b last:border-0 py-3">
-          <div><p className="font-bold">{r.numero} · {r.retirado_por}</p><p className="text-sm text-zinc-500">{r.setor||'Sem setor'} · {new Date(r.criado_em).toLocaleString('pt-BR')} · {r.total_itens} item(ns)</p></div>
-          <button onClick={async()=>setRequisicaoCriada(await fetch('/api/requisicoes/'+r.id).then(x=>x.json()))} className="px-3 py-2 rounded-lg border font-semibold">Ver comprovante</button>
-        </div>)}</div>
-      </div>}
-      {backupStatus && <div className="mb-4 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3">{backupStatus}</div>}
+      {erroCarga && (
+        <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+          Não foi possível carregar os dados: {erroCarga} <button onClick={recarregar} className="ml-2 font-bold underline">Tentar novamente</button>
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white rounded-[24px] p-6 shadow-sm border"><p className="text-zinc-500 text-lg">Total de Itens</p><p className="text-4xl font-bold">{produtos.length}</p></div>
-        <div className="bg-red-50 rounded-[24px] p-6 shadow-sm border border-red-200"><p className="text-red-700 text-lg">Em Alerta</p><p className="text-4xl font-bold text-red-600">{alerta.length}</p></div>
-        <div className="bg-blue-50 rounded-[24px] p-6 shadow-sm border border-blue-200"><p className="text-blue-700 text-lg">Movimentações Hoje</p><p className="text-4xl font-bold text-blue-700">{movs.filter(m=> new Date(m.criado_em).toDateString()===new Date().toDateString()).length}</p></div>
+      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Indicador titulo="Materiais cadastrados" valor={produtos.length} />
+        <Indicador titulo="Em alerta" valor={alerta.length} cor="red" />
+        <Indicador titulo="Movimentações hoje" valor={movs.filter(m => ehHoje(m.criado_em)).length} cor="blue" />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <button onClick={()=>setShowEntrada(true)} className="h-[84px] bg-[#16A34A] hover:bg-green-700 text-white rounded-[20px] text-xl font-bold shadow-lg flex items-center justify-center gap-3">⬇️ ENTRADA RÁPIDA</button>
-        <button onClick={()=>setShowReserva(true)} className="h-[84px] bg-[#2563EB] hover:bg-blue-700 text-white rounded-[20px] text-xl font-bold shadow-lg flex items-center justify-center gap-3">📦 SEPARAR Pedido</button>
-        <button onClick={()=>{setRequisicaoCriada(null);setShowRequisicao(true)}} className="h-[84px] bg-[#EA580C] hover:bg-orange-700 text-white rounded-[20px] text-xl font-bold shadow-lg flex items-center justify-center gap-3">📝 REGISTRAR Retirada</button>
+      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <BotaoGrande cor="bg-green-600 hover:bg-green-700" onClick={() => setJanela('entrada')}>⬇️ ENTRADA RÁPIDA</BotaoGrande>
+        <BotaoGrande cor="bg-blue-600 hover:bg-blue-700" onClick={() => setJanela('reserva')}>📦 SEPARAR PEDIDO</BotaoGrande>
+        <BotaoGrande cor="bg-orange-600 hover:bg-orange-700" onClick={() => setJanela('requisicao')}>📝 REGISTRAR RETIRADA</BotaoGrande>
       </div>
 
-      {reservas.filter(r=>['RESERVADA','SEPARADO','AGUARDANDO_RETIRADA'].includes(r.status)).length>0 && <div className="mb-8 bg-blue-50 border-2 border-blue-200 rounded-[20px] p-5"><div className="flex items-center justify-between mb-3"><h3 className="font-bold text-blue-800 text-lg">📦 Materiais separados / reservados</h3><button onClick={()=>setShowReserva(true)} className="text-blue-700 font-bold">Separar outro pedido</button></div><div className="space-y-2">{reservas.filter(r=>['SEPARADO','AGUARDANDO_RETIRADA'].includes(r.status)).slice(0,5).map(r=><div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-200 last:border-0 py-3"><div><p className="font-bold">{r.numero} · {r.finalidade}</p><p className="text-sm text-blue-700">{r.total_itens} item(ns) · {r.reservado_por||'Sem responsável'} · {new Date(r.criado_em).toLocaleString('pt-BR')}</p><span className="inline-block mt-1 px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-bold">{r.status==='RESERVADA'||r.status==='SEPARADO'?'SEPARADO':'AGUARDANDO RETIRADA'}</span></div><div className="flex gap-2"><button onClick={async()=>{try{const res=await fetch('/api/reservas/'+r.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'AGUARDANDO_RETIRADA'})});if(!res.ok)throw new Error('Erro');await carregarReservas();notify('📦 Pedido marcado como aguardando retirada')}catch(e){notify('❌ Erro ao atualizar status')}}} disabled={r.status==='AGUARDANDO_RETIRADA'} className="px-3 py-2 rounded-lg border border-blue-300 bg-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed">{r.status==='AGUARDANDO_RETIRADA'?'Aguardando retirada':'Aguardar retirada'}</button><button onClick={async()=>{const nome=window.prompt('Quem está retirando o pedido?');if(!nome)return;try{const res=await fetch('/api/reservas/'+r.id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({retirado_por:nome})});const data=await res.json();if(!res.ok)throw new Error(data.error||'Erro');await carregarReservas();setProdutos(await fetch('/api/produtos').then(x=>x.json()));await carregarRequisicoes();notify('✅ Pedido retirado e registrado')}catch(e){notify('❌ '+(e instanceof Error?e.message:'Erro'))}}} className="px-3 py-2 rounded-lg bg-orange-600 text-white font-semibold">Retirar pedido</button><button onClick={()=>cancelarReserva(r.id)} className="px-3 py-2 rounded-lg border border-blue-300 bg-white font-semibold text-red-600">Liberar</button></div></div>)}</div></div>}
+      {reservasAtivas.length > 0 && (
+        <section className="mb-8 rounded-[20px] border-2 border-blue-200 bg-blue-50 p-5">
+          <h3 className="mb-3 text-lg font-bold text-blue-800">📦 Pedidos separados / reservados ({reservasAtivas.length})</h3>
+          <div className="space-y-2">
+            {reservasAtivas.map(r => (
+              <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-200 py-3 last:border-0">
+                <div>
+                  <p className="font-bold">{r.numero} · {r.finalidade}</p>
+                  <p className="text-sm text-blue-700">{r.total_itens} item(ns) · {r.reservado_por || 'Sem responsável'} · {formatarData(r.criado_em)}</p>
+                  <span className="mt-1 inline-block rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-800">{ROTULO_STATUS[r.status]}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => acaoReserva(r, 'aguardar')} disabled={r.status === 'AGUARDANDO_RETIRADA'} className="rounded-lg border border-blue-300 bg-white px-3 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-50">
+                    {r.status === 'AGUARDANDO_RETIRADA' ? 'Aguardando retirada' : 'Marcar pronto'}
+                  </button>
+                  <button onClick={() => setRetirando(r)} className="rounded-lg bg-orange-600 px-3 py-2 font-semibold text-white">Retirar pedido</button>
+                  <button onClick={() => acaoReserva(r, 'liberar')} className="rounded-lg border border-blue-300 bg-white px-3 py-2 font-semibold text-red-600">Liberar</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
-      {alerta.length>0 && <div className="bg-white border-2 border-red-200 rounded-[20px] p-5 mb-8"><h3 className="font-bold text-red-700 text-lg mb-3">⚠️ Precisa repor:</h3><div className="flex flex-wrap gap-2">{alerta.map(a=><span key={a.id} className="bg-red-100 text-red-800 px-4 py-2 rounded-full font-semibold">{a.nome} - só {a.quantidade_atual} {a.unidade}</span>)}</div></div>}
+      {alerta.length > 0 && (
+        <section className="mb-8 rounded-[20px] border-2 border-red-200 bg-white p-5">
+          <h3 className="mb-3 text-lg font-bold text-red-700">⚠️ Precisa repor</h3>
+          <div className="flex flex-wrap gap-2">
+            {alerta.map(a => <span key={a.id} className="rounded-full bg-red-100 px-4 py-2 font-semibold text-red-800">{a.nome} — só {formatarQtd(a.quantidade_atual)} {a.unidade}</span>)}
+          </div>
+        </section>
+      )}
 
-      <div className="flex gap-2 overflow-auto pb-2 mb-4">
-        {['Todas',...CATS].map(c=><button key={c} onClick={()=>setCatFiltro(c)} className={`px-5 py-2.5 rounded-full text-base font-semibold whitespace-nowrap border-2 ${catFiltro===c ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white border-zinc-200'}`}>{c}</button>)}
-        <button onClick={()=>setShowNovo(true)} className="ml-auto px-5 py-2.5 rounded-full bg-blue-600 text-white font-bold">+ Novo Produto</button>
+      <div className="mb-4 flex gap-2 overflow-auto pb-2">
+        {['Todas', ...categorias.map(c => c.nome)].map(c => (
+          <button key={c} onClick={() => setCatFiltro(c)} className={`whitespace-nowrap rounded-full border-2 px-5 py-2.5 text-base font-semibold ${catFiltro === c ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white'}`}>{c}</button>
+        ))}
+        <button onClick={() => setJanela('novo')} className="ml-auto whitespace-nowrap rounded-full bg-blue-600 px-5 py-2.5 font-bold text-white">+ Novo material</button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtrados.map(p=>{
-          const pct = Math.min(100, (p.quantidade_atual / Math.max(p.estoque_minimo*2,1))*100)
-          const low = p.quantidade_atual <= p.estoque_minimo
-          return <div key={p.id} className={`bg-white rounded-[20px] p-5 border-2 shadow-sm ${low ? 'border-red-200' : 'border-zinc-100'}`}>
-            <div className="flex justify-between"><span className="text-xs font-bold px-3 py-1 rounded-full bg-zinc-100">{p.categoria}</span><span className={`text-xs font-bold ${low?'text-red-600':'text-green-600'}`}>{low?'ALERTA':'OK'}</span></div>
-            <h3 className="text-xl font-bold mt-3">{p.nome}</h3>
-            <p className="text-3xl font-black mt-2">{p.quantidade_atual} <span className="text-lg font-normal text-zinc-500">{p.unidade}</span></p>
-            <div className="h-2 bg-zinc-100 rounded-full mt-3"><div className={`h-2 rounded-full ${low?'bg-red-500':'bg-green-500'}`} style={{width:`${pct}%`}}></div></div>
-            <p className="text-sm text-zinc-500 mt-2">Disponível: {p.quantidade_disponivel} {p.unidade} • Reservado: {p.quantidade_reservada} {p.unidade}</p><p className="text-xs text-zinc-400 mt-1">Mínimo físico: {p.estoque_minimo} {p.unidade}</p>
-          </div>
-        })}
+      {carregando && <p className="py-10 text-center text-zinc-500">Carregando…</p>}
+      {!carregando && filtrados.length === 0 && (
+        <p className="rounded-[20px] border-2 border-dashed py-10 text-center text-zinc-500">
+          {produtos.length === 0 ? 'Nenhum material cadastrado ainda. Clique em "+ Novo material" para começar.' : 'Nenhum material encontrado.'}
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {filtrados.map(p => <CartaoProduto key={p.id} produto={p} />)}
       </div>
 
-      {movs.length>0 && <div className="mt-10 bg-white rounded-[20px] p-6 border"><h3 className="text-xl font-bold mb-4">Histórico Recente</h3><div className="space-y-3">{movs.slice(0,8).map(m=><div key={m.id} className="flex gap-3 items-center"><div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${m.tipo==='ENTRADA'?'bg-green-600':'bg-orange-600'}`}>{m.tipo==='ENTRADA'?'↓':'↑'}</div><div><p className="font-semibold">{m.tipo} - {m.produto_nome} - {m.quantidade} UN</p><p className="text-sm text-zinc-500">{m.responsavel} • {new Date(m.criado_em).toLocaleString('pt-BR')}</p></div></div>)}</div></div>}
+      <div className="mt-10 grid gap-6 lg:grid-cols-2">
+        {requisicoes.length > 0 && (
+          <section className="rounded-[20px] border bg-white p-5">
+            <h3 className="mb-3 text-xl font-bold">Últimas retiradas</h3>
+            <div className="space-y-2">
+              {requisicoes.slice(0, 6).map(r => (
+                <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-b py-3 last:border-0">
+                  <div>
+                    <p className="font-bold">{r.numero} · {r.retirado_por}</p>
+                    <p className="text-sm text-zinc-500">{r.setor || 'Sem setor'} · {formatarData(r.criado_em)} · {r.total_itens} item(ns)</p>
+                  </div>
+                  <button onClick={() => abrirComprovante(r.id)} className="rounded-lg border px-3 py-2 font-semibold hover:bg-zinc-50">Comprovante</button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
+        {movs.length > 0 && (
+          <section className="rounded-[20px] border bg-white p-5">
+            <h3 className="mb-4 text-xl font-bold">Histórico recente</h3>
+            <div className="space-y-3">
+              {movs.slice(0, 8).map(m => (
+                <div key={m.id} className="flex items-center gap-3">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-bold text-white ${m.tipo === 'ENTRADA' ? 'bg-green-600' : 'bg-orange-600'}`} aria-hidden>{m.tipo === 'ENTRADA' ? '↓' : '↑'}</div>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{m.tipo === 'ENTRADA' ? 'Entrada' : 'Saída'} · {m.produto_nome} · {formatarQtd(m.quantidade)} {m.unidade}</p>
+                    <p className="truncate text-sm text-zinc-500">{[m.responsavel, m.observacao, formatarData(m.criado_em)].filter(Boolean).join(' • ')}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
 
-      {showReserva && <div className="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center p-4 z-50"><div className="bg-white rounded-[28px] w-full max-w-3xl p-6 md:p-8 max-h-[92vh] overflow-auto"><div className="flex justify-between items-start gap-4 mb-6"><div><h2 className="text-2xl font-black">📦 Separar pedido</h2><p className="text-zinc-500">Separe materiais do estoque e deixe-os reservados até a retirada.</p></div><button onClick={()=>setShowReserva(false)} className="text-2xl">×</button></div><div className="grid md:grid-cols-2 gap-3 mb-5"><input placeholder="Pedido / finalidade * ex: Reforma da cozinha" value={reserva.finalidade} onChange={e=>setReserva({...reserva,finalidade:e.target.value})} className="h-13 border-2 rounded-xl px-4"/><input placeholder="Responsável (opcional)" value={reserva.reservado_por} onChange={e=>setReserva({...reserva,reservado_por:e.target.value})} className="h-13 border-2 rounded-xl px-4"/></div><h3 className="font-bold text-lg mb-3">Materiais a separar</h3><div className="space-y-3">{reserva.itens.map((item:any,index:number)=>{const p=produtos.find(x=>String(x.id)===String(item.produto_id));const disp=p?.quantidade_disponivel??0;return <div key={index} className="grid grid-cols-[1fr_110px_auto] gap-2"><select value={item.produto_id} onChange={e=>atualizarItemReserva(index,'produto_id',e.target.value)} className="h-13 border-2 rounded-xl px-3"><option value="">Selecione o material</option>{produtos.map(p=><option key={p.id} value={p.id}>{p.nome} — disponível: {p.quantidade_disponivel} {p.unidade}</option>)}</select><input type="number" min="0.01" placeholder="Qtd." value={item.quantidade} onChange={e=>atualizarItemReserva(index,'quantidade',e.target.value)} className="h-13 border-2 rounded-xl px-3"/><button onClick={()=>removerItemReserva(index)} disabled={reserva.itens.length===1} className="px-3 rounded-xl border text-red-600 disabled:opacity-30">Remover</button>{p&&Number(item.quantidade)>disp&&<p className="col-span-3 text-sm font-semibold text-red-600">⚠️ Só {disp} {p.unidade} estão disponíveis para reserva. O restante já está reservado.</p>}</div>})}</div><button onClick={adicionarItemReserva} className="mt-3 text-blue-600 font-bold">+ Adicionar outro material</button><textarea placeholder="Observação (opcional)" value={reserva.observacao} onChange={e=>setReserva({...reserva,observacao:e.target.value})} className="w-full border-2 rounded-xl p-3 mt-5 min-h-20"/><div className="flex gap-3 mt-5"><button onClick={()=>setShowReserva(false)} className="flex-1 h-13 rounded-xl border-2 font-bold">Cancelar</button><button onClick={criarReserva} className="flex-1 h-13 rounded-xl bg-blue-600 text-white font-bold">Confirmar separação</button></div></div></div>}
+      {sistema && (
+        <footer className="mt-10 border-t pt-4 text-center text-xs text-zinc-400">
+          Almoxarifado Local v{sistema.versao} · {sistema.modo === 'portatil' ? 'Modo portátil' : sistema.modo === 'instalado' ? 'Instalado' : 'Desenvolvimento'} · Dados em <span className="break-all">{sistema.pasta_dados}</span>
+        </footer>
+      )}
 
-      {showRequisicao && <div className="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-[28px] w-full max-w-3xl p-6 md:p-8 max-h-[92vh] overflow-auto">
-          <div className="flex justify-between items-start gap-4 mb-6"><div><h2 className="text-2xl font-black">📝 Requisição de Material</h2><p className="text-zinc-500">Registre quem retirou e quais materiais foram entregues.</p></div><button onClick={()=>setShowRequisicao(false)} className="text-2xl">×</button></div>
-          <div className="grid md:grid-cols-2 gap-3 mb-5">
-            <input placeholder="Nome de quem retirou *" value={requisicao.retirado_por} onChange={e=>setRequisicao({...requisicao,retirado_por:e.target.value})} className="h-13 border-2 rounded-xl px-4"/>
-            <input placeholder="Setor / departamento" value={requisicao.setor} onChange={e=>setRequisicao({...requisicao,setor:e.target.value})} className="h-13 border-2 rounded-xl px-4"/>
-            <input placeholder="Finalidade da retirada" value={requisicao.finalidade} onChange={e=>setRequisicao({...requisicao,finalidade:e.target.value})} className="h-13 border-2 rounded-xl px-4"/>
-            <input placeholder="Entregue por" value={requisicao.entregue_por} onChange={e=>setRequisicao({...requisicao,entregue_por:e.target.value})} className="h-13 border-2 rounded-xl px-4"/>
-          </div>
-          <h3 className="font-bold text-lg mb-3">Materiais retirados</h3>
-          <div className="space-y-3">{requisicao.itens.map((item:any,index:number)=><div key={index} className="grid grid-cols-[1fr_110px_auto] gap-2">
-            <select value={item.produto_id} onChange={e=>atualizarItemRequisicao(index,'produto_id',e.target.value)} className="h-13 border-2 rounded-xl px-3"><option value="">Selecione o material</option>{produtos.map(p=><option key={p.id} value={p.id}>{p.nome} — disponível: {p.quantidade_disponivel} {p.unidade}</option>)}</select>
-            <input type="number" min="0.01" placeholder="Qtd." value={item.quantidade} onChange={e=>atualizarItemRequisicao(index,'quantidade',e.target.value)} className="h-13 border-2 rounded-xl px-3"/>
-            <button onClick={()=>removerItemRequisicao(index)} disabled={requisicao.itens.length===1} className="px-3 rounded-xl border text-red-600 disabled:opacity-30">Remover</button>
-          </div>)}</div>
-          <button onClick={adicionarItemRequisicao} className="mt-3 text-blue-600 font-bold">+ Adicionar outro material</button>
-          <textarea placeholder="Observação (opcional)" value={requisicao.observacao} onChange={e=>setRequisicao({...requisicao,observacao:e.target.value})} className="w-full border-2 rounded-xl p-3 mt-5 min-h-20"/>
-          <div className="flex gap-3 mt-5"><button onClick={()=>setShowRequisicao(false)} className="flex-1 h-13 rounded-xl border-2 font-bold">Cancelar</button><button onClick={criarRequisicao} className="flex-1 h-13 rounded-xl bg-orange-600 text-white font-bold">Confirmar retirada</button></div>
-        </div>
-      </div>}
+      {janela === 'entrada' && <EntradaModal produtos={produtos} aoFechar={fechar} aoConcluir={concluir} />}
+      {janela === 'novo' && <NovoProdutoModal categorias={categorias} aoFechar={fechar} aoConcluir={concluir} />}
+      {janela === 'reserva' && <ReservaModal produtos={produtos} aoFechar={fechar} aoConcluir={concluir} />}
+      {janela === 'backup' && <BackupModal aoFechar={fechar} aoRestaurar={recarregar} />}
+      {janela === 'requisicao' && (
+        <RequisicaoModal produtos={produtos} aoFechar={fechar} aoConcluir={async id => { await concluir('✅ Retirada registrada'); await abrirComprovante(id) }} />
+      )}
+      {retirando && (
+        <RetirarReservaModal reserva={retirando} aoFechar={() => setRetirando(null)} aoConcluir={async id => {
+          setRetirando(null)
+          await recarregar()
+          notificar('✅ Pedido retirado e registrado')
+          await abrirComprovante(id)
+        }} />
+      )}
+      {comprovante && <Comprovante requisicao={comprovante} aoFechar={() => setComprovante(null)} />}
 
-      {requisicaoCriada && <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-        <div className="print-document bg-white rounded-[20px] w-full max-w-2xl p-8 print:shadow-none">
-          <div className="text-center border-b pb-4 mb-5"><h2 className="text-2xl font-black">ALMOXARIFADO LOCAL</h2><p className="font-bold text-lg">COMPROVANTE DE RETIRADA</p><p className="text-zinc-500">{requisicaoCriada.numero}</p></div>
-          <div className="grid grid-cols-2 gap-3 text-sm mb-5"><p><b>Retirado por:</b> {requisicaoCriada.retirado_por}</p><p><b>Setor:</b> {requisicaoCriada.setor||'—'}</p><p><b>Data:</b> {new Date(requisicaoCriada.criado_em).toLocaleString('pt-BR')}</p><p><b>Entregue por:</b> {requisicaoCriada.entregue_por||'—'}</p></div>
-          <table className="w-full border-collapse mb-5"><thead><tr className="border-b-2 text-left"><th className="py-2">Material</th><th className="py-2">Qtd.</th><th className="py-2">Un.</th></tr></thead><tbody>{requisicaoCriada.itens.map((i:any)=><tr key={i.id} className="border-b"><td className="py-2">{i.produto_nome}</td><td className="py-2">{i.quantidade}</td><td className="py-2">{i.unidade}</td></tr>)}</tbody></table>
-          {requisicaoCriada.finalidade && <p className="mb-3"><b>Finalidade:</b> {requisicaoCriada.finalidade}</p>}
-          {requisicaoCriada.observacao && <p className="mb-6"><b>Observação:</b> {requisicaoCriada.observacao}</p>}
-          <div className="grid grid-cols-2 gap-10 mt-10 text-center text-sm"><div className="border-t pt-2">Assinatura de quem retirou</div><div className="border-t pt-2">Assinatura do responsável</div></div>
-          <div className="flex gap-3 mt-8 print:hidden"><button onClick={()=>setRequisicaoCriada(null)} className="flex-1 h-12 rounded-xl border-2 font-bold">Fechar</button><button onClick={imprimirRequisicao} className="flex-1 h-12 rounded-xl bg-zinc-900 text-white font-bold">🖨️ Imprimir</button></div>
-        </div>
-      </div>}
-      {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-8 py-4 rounded-full text-lg font-bold shadow-2xl">{toast}</div>}
+      {toast && <div role="status" className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-zinc-900 px-8 py-4 text-lg font-bold text-white shadow-2xl print:hidden">{toast}</div>}
+    </div>
+  )
+}
 
-      {showEntrada && <div className="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-[28px] w-full max-w-lg p-8">
-          <h2 className="text-2xl font-black mb-2">⬇️ Entrada rápida</h2><p className="text-zinc-500 mb-6">Informe o material, a quantidade e, se quiser, uma observação. O estoque será atualizado na hora.</p>
-          <label className="block text-lg font-semibold mb-2">Qual material?</label>
-          <select value={form.produto_id||''} onChange={e=>setForm({...form,produto_id:e.target.value})} className="w-full h-14 border-2 rounded-xl px-4 text-lg mb-4">
-            <option value="">Selecione...</option>{produtos.map(p=><option key={p.id} value={p.id}>{p.nome} (tem {p.quantidade_atual})</option>)}
-          </select>
-          <label className="block text-lg font-semibold mb-2">Quantidade</label>
-          <input type="number" value={form.quantidade||''} onChange={e=>setForm({...form,quantidade:e.target.value})} className="w-full h-14 border-2 rounded-xl px-4 text-lg mb-4" placeholder="Ex: 10"/>
-          <label className="block text-lg font-semibold mb-2">Observação <span className="font-normal text-zinc-400">(opcional)</span></label>
-          <input value={form.observacao||''} onChange={e=>setForm({...form,observacao:e.target.value})} className="w-full h-14 border-2 rounded-xl px-4 text-lg mb-6" placeholder="Ex: Compra para estoque"/>
-          <div className="flex gap-3"><button onClick={()=>{setShowEntrada(false);setForm({})}} className="flex-1 h-14 rounded-xl border-2 font-bold text-lg">Cancelar</button><button onClick={()=>registrar()} className={`flex-1 h-14 rounded-xl font-bold text-lg text-white ${showEntrada?'bg-green-600':'bg-orange-600'}`}>Confirmar</button></div>
-        </div>
-      </div>}
+function Indicador({ titulo, valor, cor }: { titulo: string; valor: number; cor?: 'red' | 'blue' }) {
+  const estilos = cor === 'red' ? 'bg-red-50 border-red-200 text-red-700' : cor === 'blue' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white'
+  return (
+    <div className={`rounded-[24px] border p-6 shadow-sm ${estilos}`}>
+      <p className="text-lg opacity-80">{titulo}</p>
+      <p className="text-4xl font-bold">{valor}</p>
+    </div>
+  )
+}
 
-      {showNovo && <div className="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-[28px] w-full max-w-lg p-8">
-          <h2 className="text-2xl font-black mb-6">+ Novo Produto</h2>
-          <input placeholder="Nome do Item - ex: Fita Isolante" value={form.nome||''} onChange={e=>setForm({...form,nome:e.target.value})} className="w-full h-14 border-2 rounded-xl px-4 text-lg mb-3"/>
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <select value={form.categoria||''} onChange={e=>setForm({...form,categoria:e.target.value})} className="h-14 border-2 rounded-xl px-4 text-lg"><option>Categoria</option>{CATS.map(c=><option key={c}>{c}</option>)}</select>
-            <select value={form.unidade||'UN'} onChange={e=>setForm({...form,unidade:e.target.value})} className="h-14 border-2 rounded-xl px-4 text-lg"><option>UN</option><option>KG</option><option>CX</option><option>PAR</option><option>L</option><option>M</option></select>
-          </div>
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            <input type="number" placeholder="Qtd Inicial" value={form.qtd||''} onChange={e=>setForm({...form,qtd:e.target.value})} className="h-14 border-2 rounded-xl px-4 text-lg"/>
-            <input type="number" placeholder="Mínimo alerta" value={form.min||''} onChange={e=>setForm({...form,min:e.target.value})} className="h-14 border-2 rounded-xl px-4 text-lg"/>
-          </div>
-          <div className="flex gap-3"><button onClick={()=>setShowNovo(false)} className="flex-1 h-14 rounded-xl border-2 font-bold text-lg">Cancelar</button><button onClick={async()=>{ if(!form.nome) return; try { const res=await fetch('/api/produtos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:form.nome,quantidade:Number(form.qtd||0),minimo:Number(form.min||5),unidade:form.unidade||'UN'})}); const data=await res.json(); if(!res.ok) throw new Error(data.error||'Erro'); setProdutos(await fetch('/api/produtos').then(r=>r.json())); setShowNovo(false); setForm({}); notify('✅ Produto criado!') } catch(e){notify('❌ '+(e instanceof Error?e.message:'Erro'))}}} className="flex-1 h-14 rounded-xl bg-zinc-900 text-white font-bold text-lg">Salvar</button></div>
-        </div>
-      </div>}
+function BotaoGrande({ cor, onClick, children }: { cor: string; onClick: () => void; children: React.ReactNode }) {
+  return <button onClick={onClick} className={`flex h-[84px] items-center justify-center gap-3 rounded-[20px] text-xl font-bold text-white shadow-lg ${cor}`}>{children}</button>
+}
+
+function CartaoProduto({ produto: p }: { produto: Produto }) {
+  const baixo = p.quantidade_atual <= p.estoque_minimo
+  const pct = Math.min(100, (p.quantidade_atual / Math.max(p.estoque_minimo * 2, 1)) * 100)
+  return (
+    <div className={`rounded-[20px] border-2 bg-white p-5 shadow-sm ${baixo ? 'border-red-200' : 'border-zinc-100'}`}>
+      <div className="flex justify-between">
+        <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-bold">{p.categoria || 'Sem categoria'}</span>
+        <span className={`text-xs font-bold ${baixo ? 'text-red-600' : 'text-green-600'}`}>{baixo ? 'ALERTA' : 'OK'}</span>
+      </div>
+      <h3 className="mt-3 text-xl font-bold">{p.nome}</h3>
+      <p className="mt-2 text-3xl font-black">{formatarQtd(p.quantidade_atual)} <span className="text-lg font-normal text-zinc-500">{p.unidade}</span></p>
+      <div className="mt-3 h-2 rounded-full bg-zinc-100"><div className={`h-2 rounded-full ${baixo ? 'bg-red-500' : 'bg-green-500'}`} style={{ width: `${pct}%` }} /></div>
+      <p className="mt-2 text-sm text-zinc-500">Disponível: {formatarQtd(p.quantidade_disponivel)} {p.unidade} • Reservado: {formatarQtd(p.quantidade_reservada)} {p.unidade}</p>
+      <p className="mt-1 text-xs text-zinc-400">Alerta abaixo de {formatarQtd(p.estoque_minimo)} {p.unidade}</p>
     </div>
   )
 }
