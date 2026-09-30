@@ -1,69 +1,70 @@
 {
   "name": "almoxarifado-local",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
+  "description": "Controle de almoxarifado offline e portátil (Next.js + SQLite + Electron).",
+  "author": "Yuri Cesar",
+  "main": "electron/main.cjs",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 127.0.0.1",
     "build": "next build",
-    "start": "next start",
-    "desktop": "electron .",
-    "desktop:dev": "concurrently -k \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "desktop:build": "next build",
-    "desktop:package": "npm run build && electron-builder",
-    "postinstall": "electron-builder install-app-deps",
-    "desktop:package:win": "npm run build && electron-builder --win nsis portable"
+    "start": "next start -H 127.0.0.1",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run lint && npm run typecheck && npm test",
+    "desktop:dev": "concurrently -k \"next dev -H 127.0.0.1 -p 3000\" \"wait-on http-get://127.0.0.1:3000 && electron .\"",
+    "desktop:package": "next build && electron-builder",
+    "desktop:package:win": "next build && electron-builder --win --x64",
+    "rebuild:node": "npm rebuild better-sqlite3"
   },
   "dependencies": {
-    "next": "14.2.5",
+    "better-sqlite3": "^11.10.0",
+    "next": "^14.2.35",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "better-sqlite3": "^11.3.0"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.19",
+    "concurrently": "^9.0.1",
+    "electron": "^32.1.2",
+    "electron-builder": "^25.0.5",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.35",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.5.3",
-    "electron": "^32.1.2",
-    "concurrently": "^9.0.1",
-    "wait-on": "^8.0.1",
-    "electron-builder": "^25.0.5"
+    "vitest": "^3.2.4",
+    "wait-on": "^8.0.1"
   },
-  "main": "electron/main.cjs",
   "build": {
     "appId": "br.com.yuric9.almoxarifado",
     "productName": "Almoxarifado Local",
     "asar": false,
+    "npmRebuild": true,
     "directories": {
       "output": "release"
     },
     "files": [
       ".next/**/*",
+      "!.next/cache/**/*",
       "public/**/*",
       "electron/**/*",
       "package.json",
       "node_modules/**/*"
     ],
-    "extraMetadata": {
-      "main": "electron/main.cjs"
-    },
     "win": {
       "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] },
+        { "target": "zip", "arch": ["x64"] }
       ]
     },
     "nsis": {
@@ -71,11 +72,13 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "artifactName": "Almoxarifado-Local-Setup-${version}.exe"
+      "artifactName": "Almoxarifado-Local-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "Almoxarifado-Local-Portable-${version}.exe"
+      "artifactName": "Almoxarifado-Local-Portable-${version}.${ext}"
     },
-    "npmRebuild": true
+    "zip": {
+      "artifactName": "Almoxarifado-Local-HD-${version}.${ext}"
+    }
   }
 }

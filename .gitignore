@@ -1,9 +1,21 @@
+# dependências e build
 node_modules/
 .next/
 out/
-data/*.db
-data/*.db-shm
-data/*.db-wal
+release/
+*.tsbuildinfo
+
+# dados locais (nunca versionar o banco)
+data/
+Almoxarifado-Dados/
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+
+# ambiente e logs
 .env*
 !.env.example
 *.log
+.DS_Store
+Thumbs.db

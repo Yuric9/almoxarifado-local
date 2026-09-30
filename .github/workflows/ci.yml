@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'feature/**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verificar:
+    name: Lint, tipos, testes e build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  windows:
+    name: Pacotes Windows x64
+    needs: verificar
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Empacotar (instalador, portátil e ZIP para HD)
+        run: npm run desktop:package:win
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Gerar SHA256SUMS
+        shell: pwsh
+        run: |
+          Get-ChildItem release -File | Where-Object { $_.Extension -in '.exe', '.zip' } |
+            ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name } |
+            Set-Content release/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: almoxarifado-windows-x64
+          path: |
+            release/*.exe
+            release/*.zip
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
