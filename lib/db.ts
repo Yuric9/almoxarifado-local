@@ -99,6 +99,19 @@ function migrar(db: DB) {
   adicionarColunaSeFaltar(db, 'movimentacoes', 'requisicao_id', 'INTEGER REFERENCES requisicoes(id)')
   adicionarColunaSeFaltar(db, 'movimentacoes', 'origem', "TEXT NOT NULL DEFAULT 'MANUAL'")
   adicionarColunaSeFaltar(db, 'requisicoes', 'reserva_id', 'INTEGER REFERENCES reservas(id)')
+  adicionarColunaSeFaltar(db, 'requisicoes', 'cancelada_em', 'TEXT')
+  adicionarColunaSeFaltar(db, 'requisicoes', 'motivo_cancelamento', 'TEXT')
+  adicionarColunaSeFaltar(db, 'produtos', 'codigo', 'TEXT')
+  adicionarColunaSeFaltar(db, 'produtos', 'localizacao', 'TEXT')
+  adicionarColunaSeFaltar(db, 'produtos', 'ativo', 'INTEGER NOT NULL DEFAULT 1')
+  adicionarColunaSeFaltar(db, 'movimentacoes', 'motivo', 'TEXT')
+
+  db.exec(`
+  CREATE TABLE IF NOT EXISTS configuracoes (
+    chave TEXT PRIMARY KEY,
+    valor TEXT NOT NULL
+  );
+  `)
 
   const { total } = db.prepare('SELECT COUNT(*) AS total FROM categorias').get() as { total: number }
   if (total === 0) {
@@ -113,6 +126,8 @@ function migrar(db: DB) {
   CREATE INDEX IF NOT EXISTS idx_reserva_itens_produto ON reserva_itens(produto_id);
   CREATE INDEX IF NOT EXISTS idx_reservas_status ON reservas(status);
   CREATE INDEX IF NOT EXISTS idx_requisicao_itens_requisicao ON requisicao_itens(requisicao_id);
+  CREATE INDEX IF NOT EXISTS idx_movimentacoes_data ON movimentacoes(criado_em);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_produtos_codigo ON produtos(codigo) WHERE codigo IS NOT NULL;
   `)
 }
 
