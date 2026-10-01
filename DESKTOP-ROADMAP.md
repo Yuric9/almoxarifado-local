@@ -19,9 +19,16 @@
 - [x] Backup manual e automático diário
 - [x] Restauração com validação e cópia de segurança
 - [x] Comprovante de retirada imprimível
-- [ ] Editar / inativar material
-- [ ] Exportação CSV
-- [ ] Relatório de movimentações por período
+- [x] Editar / inativar / excluir material, com código e localização
+- [x] Baixa por perda, roubo, vencimento ou quebra
+- [x] Ajuste de inventário e estorno de retirada
+- [x] Detalhe e edição de reservas
+- [x] Importação e exportação de planilhas (.xlsx e .csv)
+- [x] Relatórios diários, mensais e por período (impressão, Excel e CSV)
+- [x] Configurações: tema claro/escuro, empresa, padrões e categorias
+- [ ] Usuários e permissões (login)
+- [ ] Cadastro de fornecedores e pedidos de compra
+- [ ] Migrar para Next.js 15 (alertas de segurança do Next 14 em recursos não usados pelo app)
 
 ## Validação manual pendente (Windows)
 - [ ] Executar a versão ZIP a partir de um HD externo e trocar de computador
