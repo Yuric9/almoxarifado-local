@@ -20,7 +20,9 @@ export async function POST(req: Request) {
       categoria_id: body.categoria_id,
       quantidade: body.quantidade,
       minimo: body.minimo,
-      unidade: body.unidade
+      unidade: body.unidade,
+      codigo: body.codigo,
+      localizacao: body.localizacao
     })
     return ok({ ok: true, id }, 201)
   } catch (e) {
