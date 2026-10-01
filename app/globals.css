@@ -2,10 +2,66 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --fundo: 241 245 249;
+  --superficie: 255 255 255;
+  --slate-50: 248 250 252;
+  --slate-100: 241 245 249;
+  --slate-200: 226 232 240;
+  --slate-300: 203 213 225;
+  --slate-400: 148 163 184;
+  --slate-500: 100 116 139;
+  --slate-600: 71 85 105;
+  --slate-700: 51 65 85;
+  --slate-800: 30 41 59;
+  --slate-900: 15 23 42;
+  --slate-950: 2 6 23;
+  color-scheme: light;
+}
+
+.dark {
+  --fundo: 11 17 32;
+  --superficie: 15 23 42;
+  --slate-50: 22 32 52;
+  --slate-100: 30 41 59;
+  --slate-200: 51 65 85;
+  --slate-300: 71 85 105;
+  --slate-400: 100 116 139;
+  --slate-500: 148 163 184;
+  --slate-600: 203 213 225;
+  --slate-700: 226 232 240;
+  --slate-800: 241 245 249;
+  --slate-900: 248 250 252;
+  --slate-950: 255 255 255;
+  color-scheme: dark;
+}
+
+/* Cores de status no tema escuro */
+.dark .bg-blue-50 { background-color: rgb(30 58 138 / 0.35); }
+.dark .bg-emerald-50 { background-color: rgb(6 78 59 / 0.45); }
+.dark .bg-amber-50 { background-color: rgb(120 53 15 / 0.4); }
+.dark .bg-red-50 { background-color: rgb(127 29 29 / 0.4); }
+.dark .text-blue-800, .dark .text-blue-700 { color: rgb(147 197 253); }
+.dark .text-emerald-800, .dark .text-emerald-700 { color: rgb(110 231 183); }
+.dark .text-amber-900, .dark .text-amber-800, .dark .text-amber-700 { color: rgb(252 211 77); }
+.dark .text-red-800, .dark .text-red-700 { color: rgb(252 165 165); }
+.dark .ring-blue-200, .dark .border-blue-200 { --tw-ring-color: rgb(30 64 175); border-color: rgb(30 64 175); }
+.dark .ring-emerald-200 { --tw-ring-color: rgb(6 95 70); }
+.dark .ring-amber-200, .dark .border-amber-200 { --tw-ring-color: rgb(146 64 14); border-color: rgb(146 64 14); }
+.dark .ring-red-200, .dark .border-red-200 { --tw-ring-color: rgb(153 27 27); border-color: rgb(153 27 27); }
+
 html { font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif; }
 body { -webkit-font-smoothing: antialiased; }
 
 @media print {
+  /* Documento impresso sempre no tema claro */
+  :root, .dark {
+    --fundo: 255 255 255;
+    --superficie: 255 255 255;
+    --slate-50: 248 250 252; --slate-100: 241 245 249; --slate-200: 226 232 240; --slate-300: 203 213 225;
+    --slate-400: 148 163 184; --slate-500: 100 116 139; --slate-600: 71 85 105; --slate-700: 51 65 85;
+    --slate-800: 30 41 59; --slate-900: 15 23 42; --slate-950: 2 6 23;
+  }
   body * { visibility: hidden; }
   .print-overlay { position: static !important; background: none !important; padding: 0 !important; }
   .print-document, .print-document * { visibility: visible; }

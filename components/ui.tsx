@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useId, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { mensagemErro } from '@/lib/cliente'
 import { X } from 'lucide-react'
 
 /* ------------------------------------------------------------------ botões */
@@ -8,8 +9,8 @@ type Variante = 'primario' | 'secundario' | 'perigo' | 'fantasma'
 
 const VARIANTES: Record<Variante, string> = {
   primario: 'bg-blue-700 text-white hover:bg-blue-800 border-blue-700',
-  secundario: 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300',
-  perigo: 'bg-white text-red-700 hover:bg-red-50 border-slate-300',
+  secundario: 'bg-superficie text-slate-700 hover:bg-slate-50 border-slate-300',
+  perigo: 'bg-superficie text-red-700 hover:bg-red-50 border-slate-300',
   fantasma: 'bg-transparent text-slate-600 hover:bg-slate-100 border-transparent'
 }
 
@@ -33,7 +34,7 @@ export function Botao({ variante = 'secundario', icone, children, className = ''
 
 /** Campo sem largura definida (para barras de filtro). */
 export const classeCampo =
-  'h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20'
+  'h-9 rounded-md border border-slate-300 bg-superficie px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20'
 
 export const classeInput = `${classeCampo} w-full`
 
@@ -49,12 +50,46 @@ export function Campo({ rotulo, opcional, children, className = '' }: { rotulo: 
   )
 }
 
+export const classeTextarea =
+  'min-h-[72px] w-full rounded-md border border-slate-300 bg-superficie px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20'
+
+/** Controla o estado "enviando" e o erro exibido dentro de um formulário. */
+export function useEnvio() {
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState('')
+  async function executar(acao: () => Promise<void>) {
+    setEnviando(true)
+    setErro('')
+    try {
+      await acao()
+    } catch (e) {
+      setErro(mensagemErro(e))
+    } finally {
+      setEnviando(false)
+    }
+  }
+  return { enviando, erro, setErro, executar }
+}
+
 export function AvisoErro({ texto }: { texto: string }) {
   if (!texto) return null
   return <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{texto}</p>
 }
 
 /* ------------------------------------------------------------------ modal */
+
+/** Esc fecha apenas o diálogo que está por cima (modais podem se empilhar). */
+export function useFecharComEsc(id: string, aoFechar: () => void) {
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const dialogos = document.querySelectorAll('[data-dialogo]')
+      if (dialogos[dialogos.length - 1]?.getAttribute('data-dialogo') === id) aoFechar()
+    }
+    window.addEventListener('keydown', tecla)
+    return () => window.removeEventListener('keydown', tecla)
+  }, [id, aoFechar])
+}
 
 export function Modal({ titulo, descricao, aoFechar, largura = 'max-w-lg', rodape, children }: {
   titulo: string
@@ -65,15 +100,11 @@ export function Modal({ titulo, descricao, aoFechar, largura = 'max-w-lg', rodap
   children: ReactNode
 }) {
   const tituloId = useId()
-  useEffect(() => {
-    const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') aoFechar() }
-    window.addEventListener('keydown', tecla)
-    return () => window.removeEventListener('keydown', tecla)
-  }, [aoFechar])
+  useFecharComEsc(tituloId, aoFechar)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 print:hidden" onMouseDown={e => { if (e.target === e.currentTarget) aoFechar() }}>
-      <div role="dialog" aria-modal="true" aria-labelledby={tituloId} className={`flex max-h-[90vh] w-full flex-col rounded-lg bg-white shadow-xl ${largura}`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden" onMouseDown={e => { if (e.target === e.currentTarget) aoFechar() }}>
+      <div role="dialog" aria-modal="true" aria-labelledby={tituloId} data-dialogo={tituloId} className={`flex max-h-[90vh] w-full flex-col rounded-lg bg-superficie shadow-xl ${largura}`}>
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
           <div>
             <h2 id={tituloId} className="text-base font-semibold text-slate-900">{titulo}</h2>
@@ -132,7 +163,7 @@ export function Badge({ tom = 'neutro', children }: { tom?: Tom; children: React
 
 export function Painel({ titulo, acoes, children, semPadding }: { titulo?: string; acoes?: ReactNode; children: ReactNode; semPadding?: boolean }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white">
+    <section className="rounded-lg border border-slate-200 bg-superficie">
       {(titulo || acoes) && (
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
           {titulo && <h2 className="text-sm font-semibold text-slate-900">{titulo}</h2>}
