@@ -1,34 +1,14 @@
 'use client'
 import { useState, type FormEvent } from 'react'
-import { api, formatarQtd, mensagemErro } from '@/lib/cliente'
-import { UNIDADES, type Categoria, type Produto, type ReservaResumo } from '@/lib/tipos'
+import { api, formatarQtd } from '@/lib/cliente'
+import type { Produto, ReservaDetalhe, ReservaResumo } from '@/lib/tipos'
 import { ItensMateriais, itensPreenchidos, linhaVazia, type LinhaItem } from './ItensMateriais'
-import { AvisoErro, Campo, ModalFormulario, classeInput } from './ui'
+import { AvisoErro, Campo, ModalFormulario, classeInput, classeTextarea, useEnvio } from './ui'
 
 type Base = { aoFechar: () => void; aoConcluir: (mensagem: string) => void | Promise<void> }
 
-const classeTextarea = 'min-h-[72px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20'
-
-/** Controla o estado "enviando" e o erro exibido dentro do formulário. */
-function useEnvio() {
-  const [enviando, setEnviando] = useState(false)
-  const [erro, setErro] = useState('')
-  async function executar(acao: () => Promise<void>) {
-    setEnviando(true)
-    setErro('')
-    try {
-      await acao()
-    } catch (e) {
-      setErro(mensagemErro(e))
-    } finally {
-      setEnviando(false)
-    }
-  }
-  return { enviando, erro, executar }
-}
-
-export function EntradaModal({ produtos, aoFechar, aoConcluir }: Base & { produtos: Produto[] }) {
-  const [produtoId, setProdutoId] = useState('')
+export function EntradaModal({ produtos, produtoInicial, aoFechar, aoConcluir }: Base & { produtos: Produto[]; produtoInicial?: number }) {
+  const [produtoId, setProdutoId] = useState(produtoInicial ? String(produtoInicial) : '')
   const [quantidade, setQuantidade] = useState('')
   const [observacao, setObservacao] = useState('')
   const { enviando, erro, executar } = useEnvio()
@@ -47,14 +27,14 @@ export function EntradaModal({ produtos, aoFechar, aoConcluir }: Base & { produt
   return (
     <ModalFormulario titulo="Registrar entrada" descricao="Soma a quantidade ao estoque do material." aoFechar={aoFechar} aoEnviar={enviar} rotuloEnviar="Registrar entrada" enviando={enviando}>
       <Campo rotulo="Material">
-        <select autoFocus value={produtoId} onChange={e => setProdutoId(e.target.value)} className={classeInput}>
+        <select autoFocus={!produtoInicial} value={produtoId} onChange={e => setProdutoId(e.target.value)} className={classeInput}>
           <option value="">Selecione…</option>
-          {produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+          {produtos.map(p => <option key={p.id} value={p.id}>{p.codigo ? `${p.codigo} · ` : ''}{p.nome}</option>)}
         </select>
       </Campo>
       <div className="grid grid-cols-2 gap-3">
         <Campo rotulo="Quantidade">
-          <input type="number" min="0" step="any" inputMode="decimal" value={quantidade} onChange={e => setQuantidade(e.target.value)} className={classeInput} placeholder="0" />
+          <input autoFocus={!!produtoInicial} type="number" min="0" step="any" inputMode="decimal" value={quantidade} onChange={e => setQuantidade(e.target.value)} className={classeInput} placeholder="0" />
         </Campo>
         <Campo rotulo="Estoque atual">
           <input readOnly tabIndex={-1} value={selecionado ? `${formatarQtd(selecionado.quantidade_atual)} ${selecionado.unidade}` : '—'} className={`${classeInput} bg-slate-50 text-slate-500`} />
@@ -68,59 +48,12 @@ export function EntradaModal({ produtos, aoFechar, aoConcluir }: Base & { produt
   )
 }
 
-export function NovoProdutoModal({ categorias, aoFechar, aoConcluir }: Base & { categorias: Categoria[] }) {
-  const [form, setForm] = useState({ nome: '', categoria_id: '', unidade: 'UN', quantidade: '', minimo: '' })
-  const { enviando, erro, executar } = useEnvio()
-  const campo = (nome: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [nome]: e.target.value })
-
-  const enviar = (e: FormEvent) => {
-    e.preventDefault()
-    executar(async () => {
-      await api('/api/produtos', {
-        method: 'POST',
-        json: {
-          nome: form.nome,
-          categoria_id: form.categoria_id ? Number(form.categoria_id) : null,
-          unidade: form.unidade,
-          quantidade: form.quantidade === '' ? 0 : Number(form.quantidade),
-          minimo: form.minimo === '' ? undefined : Number(form.minimo)
-        }
-      })
-      await aoConcluir('Material cadastrado')
-    })
-  }
-
-  return (
-    <ModalFormulario titulo="Novo material" aoFechar={aoFechar} aoEnviar={enviar} rotuloEnviar="Cadastrar" enviando={enviando}>
-      <Campo rotulo="Nome do material">
-        <input autoFocus required value={form.nome} onChange={campo('nome')} className={classeInput} placeholder="Ex.: Fita isolante 19mm" />
-      </Campo>
-      <div className="grid grid-cols-2 gap-3">
-        <Campo rotulo="Categoria">
-          <select value={form.categoria_id} onChange={campo('categoria_id')} className={classeInput}>
-            <option value="">Sem categoria</option>
-            {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-          </select>
-        </Campo>
-        <Campo rotulo="Unidade">
-          <select value={form.unidade} onChange={campo('unidade')} className={classeInput}>
-            {UNIDADES.map(u => <option key={u}>{u}</option>)}
-          </select>
-        </Campo>
-        <Campo rotulo="Estoque inicial">
-          <input type="number" min="0" step="any" value={form.quantidade} onChange={campo('quantidade')} className={classeInput} placeholder="0" />
-        </Campo>
-        <Campo rotulo="Estoque mínimo">
-          <input type="number" min="0" step="any" value={form.minimo} onChange={campo('minimo')} className={classeInput} placeholder="5" />
-        </Campo>
-      </div>
-      <AvisoErro texto={erro} />
-    </ModalFormulario>
-  )
-}
-
-export function RequisicaoModal({ produtos, aoFechar, aoConcluir }: Omit<Base, 'aoConcluir'> & { produtos: Produto[]; aoConcluir: (id: number) => void | Promise<void> }) {
-  const [dados, setDados] = useState({ retirado_por: '', setor: '', finalidade: '', entregue_por: '', observacao: '' })
+export function RequisicaoModal({ produtos, entreguePorPadrao, aoFechar, aoConcluir }: Omit<Base, 'aoConcluir'> & {
+  produtos: Produto[]
+  entreguePorPadrao?: string
+  aoConcluir: (id: number) => void | Promise<void>
+}) {
+  const [dados, setDados] = useState({ retirado_por: '', setor: '', finalidade: '', entregue_por: entreguePorPadrao || '', observacao: '' })
   const [linhas, setLinhas] = useState<LinhaItem[]>([linhaVazia()])
   const { enviando, erro, executar } = useEnvio()
   const campo = (nome: keyof typeof dados) => (e: { target: { value: string } }) => setDados({ ...dados, [nome]: e.target.value })
@@ -152,29 +85,58 @@ export function RequisicaoModal({ produtos, aoFechar, aoConcluir }: Omit<Base, '
   )
 }
 
-export function ReservaModal({ produtos, aoFechar, aoConcluir }: Base & { produtos: Produto[] }) {
-  const [dados, setDados] = useState({ finalidade: '', reservado_por: '', observacao: '' })
-  const [linhas, setLinhas] = useState<LinhaItem[]>([linhaVazia()])
+/** Cria uma reserva nova ou edita uma reserva aberta (quando `reserva` é informada). */
+export function ReservaModal({ produtos, reserva, aoFechar, aoConcluir }: Base & { produtos: Produto[]; reserva?: ReservaDetalhe }) {
+  const editando = !!reserva
+  const [dados, setDados] = useState({
+    finalidade: reserva?.finalidade || '',
+    reservado_por: reserva?.reservado_por || '',
+    observacao: reserva?.observacao || ''
+  })
+  const [linhas, setLinhas] = useState<LinhaItem[]>(
+    reserva?.itens.length ? reserva.itens.map(i => ({ produto_id: String(i.produto_id), quantidade: String(i.quantidade) })) : [linhaVazia()]
+  )
   const { enviando, erro, executar } = useEnvio()
   const campo = (nome: keyof typeof dados) => (e: { target: { value: string } }) => setDados({ ...dados, [nome]: e.target.value })
+
+  // Ao editar, a quantidade já reservada por esta reserva volta a contar como disponível.
+  const produtosDisponiveis = editando
+    ? produtos.map(p => {
+        const proprio = reserva.itens.filter(i => i.produto_id === p.id).reduce((t, i) => t + i.quantidade, 0)
+        return proprio ? { ...p, quantidade_disponivel: p.quantidade_disponivel + proprio } : p
+      })
+    : produtos
 
   const enviar = (e: FormEvent) => {
     e.preventDefault()
     executar(async () => {
       const itens = itensPreenchidos(linhas)
       if (!itens.length) throw new Error('Adicione pelo menos um material com quantidade')
-      await api('/api/reservas', { method: 'POST', json: { ...dados, itens } })
-      await aoConcluir('Reserva criada')
+      if (editando) {
+        await api(`/api/reservas/${reserva.id}`, { method: 'PUT', json: { ...dados, itens } })
+        await aoConcluir(`Reserva ${reserva.numero} atualizada`)
+      } else {
+        await api('/api/reservas', { method: 'POST', json: { ...dados, itens } })
+        await aoConcluir('Reserva criada')
+      }
     })
   }
 
   return (
-    <ModalFormulario titulo="Nova reserva" descricao="Separa materiais para um pedido. O estoque físico só é baixado na retirada." aoFechar={aoFechar} largura="max-w-2xl" aoEnviar={enviar} rotuloEnviar="Criar reserva" enviando={enviando}>
+    <ModalFormulario
+      titulo={editando ? `Editar reserva ${reserva.numero}` : 'Nova reserva'}
+      descricao="Separa materiais para um pedido. O estoque físico só é baixado na retirada."
+      aoFechar={aoFechar}
+      largura="max-w-2xl"
+      aoEnviar={enviar}
+      rotuloEnviar={editando ? 'Salvar alterações' : 'Criar reserva'}
+      enviando={enviando}
+    >
       <div className="grid gap-3 sm:grid-cols-2">
         <Campo rotulo="Pedido / finalidade"><input autoFocus required value={dados.finalidade} onChange={campo('finalidade')} className={classeInput} placeholder="Ex.: Reforma da cozinha" /></Campo>
         <Campo rotulo="Responsável" opcional><input value={dados.reservado_por} onChange={campo('reservado_por')} className={classeInput} /></Campo>
       </div>
-      <ItensMateriais produtos={produtos} linhas={linhas} aoMudar={setLinhas} avisoDisponivel="O restante já está reservado." />
+      <ItensMateriais produtos={produtosDisponiveis} linhas={linhas} aoMudar={setLinhas} avisoDisponivel="O restante já está reservado." />
       <Campo rotulo="Observação" opcional>
         <textarea value={dados.observacao} onChange={campo('observacao')} className={classeTextarea} />
       </Campo>
@@ -184,7 +146,10 @@ export function ReservaModal({ produtos, aoFechar, aoConcluir }: Base & { produt
 }
 
 /** Substitui o window.prompt(), que não funciona no Electron. */
-export function RetirarReservaModal({ reserva, aoFechar, aoConcluir }: Omit<Base, 'aoConcluir'> & { reserva: ReservaResumo; aoConcluir: (requisicaoId: number) => void | Promise<void> }) {
+export function RetirarReservaModal({ reserva, aoFechar, aoConcluir }: Omit<Base, 'aoConcluir'> & {
+  reserva: Pick<ReservaResumo, 'id' | 'numero' | 'finalidade'>
+  aoConcluir: (requisicaoId: number) => void | Promise<void>
+}) {
   const [nome, setNome] = useState('')
   const { enviando, erro, executar } = useEnvio()
 

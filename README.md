@@ -6,13 +6,19 @@ Feito com Next.js 14, React 18, Tailwind CSS, SQLite (`better-sqlite3`) e Electr
 
 ## Funcionalidades
 
-- **Materiais** com categoria, unidade (UN, KG, CX, L…) e alerta de estoque mínimo.
+- **Painel** com indicadores clicáveis (materiais, abaixo do mínimo, reservas abertas, movimentações do dia).
+- **Materiais** com código, categoria, unidade, localização e estoque mínimo. Clicar em um material abre a **ficha**, com histórico, reservas e as ações de entrada, baixa, ajuste, edição, inativação e exclusão.
 - **Entrada rápida**: material, quantidade e observação.
-- **Requisição de retirada** com número automático (`REQ-2026-000001`) e **comprovante para imprimir** com campos de assinatura.
-- **Reservas / pedidos separados**: bloqueiam a quantidade sem baixar o estoque físico. Ciclo: `SEPARADO → AGUARDANDO_RETIRADA → RETIRADO` (ou `CANCELADO`).
-- Diferencia **estoque físico**, **reservado** e **disponível**. Uma retirada comum nunca consome material reservado.
-- **Auditoria**: toda movimentação registra a origem (`ESTOQUE_INICIAL`, `ENTRADA_MANUAL`, `REQUISICAO`, `RESERVA`) e o vínculo com a requisição.
+- **Baixa por perda, roubo, vencimento ou quebra**, com motivo registrado no histórico.
+- **Ajuste de inventário**: informe a quantidade contada e o sistema lança a diferença.
+- **Requisição de retirada** com número automático (`REQ-2026-000001`), **comprovante A4 para imprimir** e **estorno** de retiradas lançadas por engano.
+- **Reservas / pedidos separados**: bloqueiam a quantidade sem baixar o estoque físico. Clicar no pedido mostra os itens e permite editar, retirar ou cancelar. Ciclo: `SEPARADO → AGUARDANDO_RETIRADA → RETIRADO` (ou `CANCELADO`).
+- **Relatórios** diários, mensais ou por período: totais, movimentação dia a dia, saldo inicial e final por material, retiradas e movimentações, com impressão e exportação em Excel e CSV.
+- **Planilhas**: exportar os materiais em Excel (.xlsx) ou CSV e importar em lote, com planilha modelo.
+- **Configurações**: tema claro, escuro ou igual ao Windows; nome da empresa no comprovante; padrões; e categorias (criar, renomear, mudar cor e excluir).
 - **Backup automático diário**, backup manual e **restauração** pela própria tela.
+- Diferencia **estoque físico**, **reservado** e **disponível**. Uma retirada comum nunca consome material reservado.
+- **Auditoria**: toda movimentação registra a origem (estoque inicial, entrada, retirada, reserva, baixa, ajuste ou estorno), o motivo e o vínculo com a requisição.
 
 ## Uso no HD externo (modo portátil)
 
@@ -69,9 +75,13 @@ app/
 components/              modais, formulários e comprovante
 lib/
   db.ts                  conexão SQLite (aberta sob demanda) e migrações
-  repository.ts          regras de negócio (única camada que acessa o banco)
+  repository.ts          regras de negócio: materiais, categorias, entradas, baixas, ajustes, retiradas e reservas
+  relatorios.ts          relatórios por período
+  planilha.ts            importação e exportação de planilhas (.xlsx e .csv)
+  configuracoes.ts       preferências salvas no banco
   backup.ts              backup, backup automático e restauração
   paths.ts               onde ficam banco e backups
+scripts/                 utilitários de build
 electron/main.cjs        janela desktop, servidor interno e escolha da pasta de dados
 tests/                   testes automatizados
 ```

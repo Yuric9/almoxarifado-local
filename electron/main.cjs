@@ -9,6 +9,9 @@ const HOST = '127.0.0.1'
 const PASTA_DADOS_PORTATIL = 'Almoxarifado-Dados'
 const DEV_URL = process.env.ALMOXARIFADO_DEV_URL || 'http://127.0.0.1:3000'
 
+// Datas, calendários e números sempre em português, independente do idioma do Windows.
+app.commandLine.appendSwitch('lang', 'pt-BR')
+
 let serverProcess = null
 let janela = null
 let encerrando = false

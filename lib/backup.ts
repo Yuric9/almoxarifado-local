@@ -2,9 +2,8 @@ import Database from 'better-sqlite3'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fecharBanco, getDb } from './db'
+import { lerConfiguracoes } from './configuracoes'
 import { arquivoBanco, pastaBackups } from './paths'
-
-const MAX_BACKUPS_AUTOMATICOS = 15
 
 export type BackupInfo = { nome: string; tamanho: number; criado_em: string }
 
@@ -38,7 +37,7 @@ export function backupAutomaticoDiario() {
   const existentes = listarBackups().filter(b => b.nome.startsWith('almoxarifado-auto-'))
   if (existentes.some(b => b.nome.startsWith(`almoxarifado-auto-${hoje}`))) return null
   const criado = criarBackup('auto')
-  for (const antigo of existentes.slice(MAX_BACKUPS_AUTOMATICOS - 1)) {
+  for (const antigo of existentes.slice(lerConfiguracoes().backups_manter - 1)) {
     fs.rmSync(path.join(pastaBackups(), antigo.nome), { force: true })
   }
   return criado

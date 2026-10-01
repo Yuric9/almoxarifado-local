@@ -1,5 +1,5 @@
 import { falha, idDaRota, lerJson, ok } from '@/lib/api'
-import { atualizarStatusReserva, cancelarReserva, obterReserva, retirarReserva } from '@/lib/repository'
+import { atualizarReserva, atualizarStatusReserva, cancelarReserva, obterReserva, retirarReserva, type ItemInput } from '@/lib/repository'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -29,6 +29,22 @@ export async function PATCH(req: Request, { params }: Contexto) {
   try {
     const body = await lerJson(req)
     atualizarStatusReserva(idDaRota(params.id), body.status)
+    return ok({ ok: true })
+  } catch (e) {
+    return falha(e)
+  }
+}
+
+/** Edita dados e materiais de uma reserva aberta. */
+export async function PUT(req: Request, { params }: Contexto) {
+  try {
+    const body = await lerJson(req)
+    atualizarReserva(idDaRota(params.id), {
+      finalidade: body.finalidade,
+      reservado_por: body.reservado_por,
+      observacao: body.observacao,
+      itens: Array.isArray(body.itens) ? (body.itens as ItemInput[]) : []
+    })
     return ok({ ok: true })
   } catch (e) {
     return falha(e)

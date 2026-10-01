@@ -1,6 +1,6 @@
 {
   "name": "almoxarifado-local",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Controle de almoxarifado offline e portátil (Next.js + SQLite + Electron).",
   "author": "Yuri Cesar",
@@ -17,16 +17,18 @@
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm test",
     "desktop:dev": "concurrently -k \"next dev -H 127.0.0.1 -p 3000\" \"wait-on http-get://127.0.0.1:3000 && electron .\"",
-    "desktop:package": "next build && electron-builder",
-    "desktop:package:win": "next build && electron-builder --win --x64",
-    "rebuild:node": "npm rebuild better-sqlite3"
+    "desktop:package": "next build && node scripts/limpar-cache-nativo.cjs && electron-builder --publish never",
+    "desktop:package:win": "next build && node scripts/limpar-cache-nativo.cjs && electron-builder --win --x64 --publish never",
+    "rebuild:node": "npm rebuild better-sqlite3 && node scripts/limpar-cache-nativo.cjs"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",
     "lucide-react": "^1.49.0",
     "next": "^14.2.35",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "read-excel-file": "^9.3.10",
+    "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
