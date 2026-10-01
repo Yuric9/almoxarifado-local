@@ -17,8 +17,8 @@
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm test",
     "desktop:dev": "concurrently -k \"next dev -H 127.0.0.1 -p 3000\" \"wait-on http-get://127.0.0.1:3000 && electron .\"",
-    "desktop:package": "next build && electron-builder",
-    "desktop:package:win": "next build && electron-builder --win --x64",
+    "desktop:package": "next build && electron-builder --publish never",
+    "desktop:package:win": "next build && electron-builder --win --x64 --publish never",
     "rebuild:node": "npm rebuild better-sqlite3"
   },
   "dependencies": {
