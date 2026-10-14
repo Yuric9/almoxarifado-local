@@ -341,7 +341,10 @@ export function listarMovimentacoes(filtro: FiltroMovimentacoes = {}): Movimenta
  * Entrada rápida de material. Saídas só acontecem por requisição
  * (criarRequisicao / retirarReserva), para manter a auditoria.
  */
-export function registrarEntrada(input: { produto_id: unknown; quantidade: unknown; responsavel?: unknown; observacao?: unknown }) {
+export function registrarEntrada(
+  input: { produto_id: unknown; quantidade: unknown; responsavel?: unknown; observacao?: unknown },
+  origem: 'ENTRADA_MANUAL' | 'IMPORTACAO' = 'ENTRADA_MANUAL'
+) {
   const db = getDb()
   db.transaction(() => {
     const produtoId = Number(input.produto_id)
@@ -352,7 +355,54 @@ export function registrarEntrada(input: { produto_id: unknown; quantidade: unkno
     db.prepare(`
       INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao,origem)
       VALUES (?,?,?,?,?,?)
-    `).run(produtoId, 'ENTRADA', quantidade, texto(input.responsavel), texto(input.observacao), 'ENTRADA_MANUAL')
+    `).run(produtoId, 'ENTRADA', quantidade, texto(input.responsavel), texto(input.observacao), origem)
+  })()
+}
+
+export type ItemImportacao = {
+  /** Material existente. Se vazio, um material novo é criado com os dados abaixo. */
+  produto_id?: number | null
+  nome?: unknown
+  codigo?: unknown
+  unidade?: unknown
+  categoria_id?: unknown
+  quantidade?: unknown
+}
+
+/**
+ * Grava os itens conferidos de um documento importado (nota fiscal, pedido, lista).
+ * Cria os materiais novos e, no modo "entrada", soma as quantidades ao estoque.
+ * Tudo em uma transação: se um item falhar, nada é gravado.
+ */
+export function aplicarImportacao(input: { modo: unknown; itens: unknown; observacao?: unknown; responsavel?: unknown }) {
+  const modo = input.modo === 'cadastro' ? 'cadastro' : input.modo === 'entrada' ? 'entrada' : null
+  if (!modo) throw new Error('Escolha entre dar entrada no estoque ou apenas cadastrar')
+  if (!Array.isArray(input.itens) || !input.itens.length) throw new Error('Nenhum item selecionado')
+  const itens = input.itens as ItemImportacao[]
+  const db = getDb()
+  return db.transaction(() => {
+    const resultado = { criados: 0, entradas: 0 }
+    itens.forEach((item, i) => {
+      const rotulo = `Item ${i + 1}${texto(item.nome) ? ` (${texto(item.nome)})` : ''}`
+      try {
+        let produtoId = item.produto_id ? Number(item.produto_id) : null
+        if (produtoId) {
+          const p = db.prepare('SELECT ativo FROM produtos WHERE id=?').get(produtoId) as { ativo: number } | undefined
+          if (!p) throw new Error('material não encontrado')
+          if (!p.ativo) throw new Error('o material está inativo')
+        } else {
+          produtoId = criarProduto({ nome: item.nome, codigo: item.codigo, unidade: item.unidade, categoria_id: item.categoria_id, quantidade: 0 })
+          resultado.criados++
+        }
+        if (modo === 'entrada') {
+          registrarEntrada({ produto_id: produtoId, quantidade: item.quantidade, responsavel: input.responsavel, observacao: input.observacao }, 'IMPORTACAO')
+          resultado.entradas++
+        }
+      } catch (e) {
+        throw new Error(`${rotulo}: ${e instanceof Error ? e.message : 'erro'}`)
+      }
+    })
+    return resultado
   })()
 }
 

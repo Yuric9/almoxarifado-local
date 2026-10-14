@@ -3,6 +3,7 @@ export type { Categoria, Produto, Movimentacao, Requisicao, Reserva, ItemDocumen
 export type { Configuracoes, Tema } from './configuracoes'
 export type { Relatorio } from './relatorios'
 export type { ResultadoImportacao } from './planilha'
+export type { DocumentoLido } from './documento'
 export { UNIDADES, MOTIVOS_BAIXA, ORIGENS, descreverOrigem, type MotivoBaixa } from './constantes'
 import type { Categoria, ItemDocumento, Movimentacao, Produto, Requisicao, Reserva, StatusReserva } from './repository'
 

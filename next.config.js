@@ -3,7 +3,7 @@ module.exports = {
   reactStrictMode: true,
   poweredByHeader: false,
   experimental: {
-    // Módulo nativo: carregado do node_modules em tempo de execução, nunca empacotado.
-    serverComponentsExternalPackages: ['better-sqlite3']
+    // Carregados do node_modules em tempo de execução, nunca empacotados (módulo nativo e leitor de PDF).
+    serverComponentsExternalPackages: ['better-sqlite3', 'unpdf']
   }
 }
