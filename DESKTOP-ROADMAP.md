@@ -26,6 +26,9 @@
 - [x] Importação e exportação de planilhas (.xlsx e .csv)
 - [x] Relatórios diários, mensais e por período (impressão, Excel e CSV)
 - [x] Configurações: tema claro/escuro, empresa, padrões e categorias
+- [x] Importar nota fiscal (DANFE), pedido ou lista em PDF, Word ou Excel
+- [ ] Leitura de PDF escaneado (OCR)
+- [ ] Importar o XML da NF-e (mais preciso que o PDF)
 - [ ] Usuários e permissões (login)
 - [ ] Cadastro de fornecedores e pedidos de compra
 - [ ] Migrar para Next.js 15 (alertas de segurança do Next 14 em recursos não usados pelo app)
