@@ -15,7 +15,7 @@ Feito com Next.js 14, React 18, Tailwind CSS, SQLite (`better-sqlite3`) e Electr
 - **Reservas / pedidos separados**: bloqueiam a quantidade sem baixar o estoque físico. Clicar no pedido mostra os itens e permite editar, retirar ou cancelar. Ciclo: `SEPARADO → AGUARDANDO_RETIRADA → RETIRADO` (ou `CANCELADO`).
 - **Relatórios** diários, mensais ou por período: totais, movimentação dia a dia, saldo inicial e final por material, retiradas e movimentações, com impressão e exportação em Excel e CSV.
 - **Planilhas**: exportar os materiais em Excel (.xlsx) ou CSV e importar em lote, com planilha modelo.
-- **Importar documento** (PDF, Word ou Excel): lê **notas fiscais (DANFE)**, pedidos e listas de materiais, sugere o material já cadastrado de cada item e, depois da sua conferência, dá entrada no estoque (com número da NF e fornecedor no histórico) ou apenas cadastra os materiais. PDFs escaneados (imagem) não têm texto e não podem ser lidos.
+- **Importar documento** (XML da NF-e, PDF, Word ou Excel): lê **notas fiscais (XML ou DANFE em PDF)**, pedidos e listas de materiais, sugere o material já cadastrado de cada item e, depois da sua conferência, dá entrada no estoque (com número da NF e fornecedor no histórico) ou apenas cadastra os materiais. PDFs escaneados (imagem) não têm texto e não podem ser lidos.
 - **Configurações**: tema claro, escuro ou igual ao Windows; nome da empresa no comprovante; padrões; e categorias (criar, renomear, mudar cor e excluir).
 - **Backup automático diário**, backup manual e **restauração** pela própria tela.
 - Diferencia **estoque físico**, **reservado** e **disponível**. Uma retirada comum nunca consome material reservado.
@@ -79,7 +79,7 @@ lib/
   repository.ts          regras de negócio: materiais, categorias, entradas, baixas, ajustes, retiradas e reservas
   relatorios.ts          relatórios por período
   planilha.ts            importação e exportação de planilhas (.xlsx e .csv)
-  documento.ts           leitura de notas fiscais, pedidos e listas em PDF, Word e Excel
+  documento.ts           leitura de notas fiscais (XML/PDF), pedidos e listas em Word e Excel
   configuracoes.ts       preferências salvas no banco
   backup.ts              backup, backup automático e restauração
   paths.ts               onde ficam banco e backups

@@ -42,6 +42,26 @@ describe('nota fiscal (DANFE) em PDF', () => {
   })
 })
 
+describe('nota fiscal em XML (NF-e)', () => {
+  it('lê número, emitente, data e itens com ponto decimal, entidades e CDATA', async () => {
+    const doc = await lerDocumento(fixture('nfe.xml'), 'NFe351.xml')
+    expect(doc).toMatchObject({ tipo: 'nfe', formato: 'xml', numero: '1234', fornecedor: 'CONSTRUFORTE MATERIAIS DE CONSTRUÇÃO LTDA', data: '08/10/2024', avisos: [] })
+    expect(doc.itens.map(({ sugestao, ...i }) => i)).toEqual([
+      { codigo: 'CIM-001', descricao: 'CIMENTO PORTLAND CP II-E-32 SACO 50KG', unidade: 'SC', quantidade: 40, valor_unitario: 38.9 },
+      { codigo: 'TIJ-8F', descricao: 'TIJOLO CERÂMICO 8 FUROS 9X19X19 & AMARRAÇÃO', unidade: 'MIL', quantidade: 2, valor_unitario: 950 },
+      { codigo: 'ARE-M', descricao: 'AREIA MÉDIA LAVADA', unidade: 'M³', quantidade: 6.5, valor_unitario: 120 }
+    ])
+  })
+
+  it('aceita prefixo de namespace e recusa XML que não é NF-e completa', async () => {
+    const comPrefixo = '<nfe:NFe xmlns:nfe="x"><nfe:infNFe><nfe:ide><nfe:nNF>9</nfe:nNF><nfe:dEmi>2023-01-05</nfe:dEmi></nfe:ide><nfe:det nItem="1"><nfe:prod><nfe:xProd>LUVA</nfe:xProd><nfe:uCom>PAR</nfe:uCom><nfe:qCom>3</nfe:qCom></nfe:prod></nfe:det></nfe:infNFe></nfe:NFe>'
+    const doc = await lerDocumento(Buffer.from(comPrefixo), 'nota.XML')
+    expect(doc).toMatchObject({ numero: '9', data: '05/01/2023', itens: [{ descricao: 'LUVA', unidade: 'PAR', quantidade: 3 }] })
+    await expect(lerDocumento(Buffer.from('<resNFe><chNFe>1</chNFe></resNFe>'), 'r.xml')).rejects.toThrow('resumo da nota')
+    await expect(lerDocumento(Buffer.from('<pedido/>'), 'p.xml')).rejects.toThrow('não é de uma nota fiscal')
+  })
+})
+
 describe('tabelas', () => {
   it('lê um pedido em PDF pelas colunas do cabeçalho', async () => {
     const doc = await lerDocumento(fixture('pedido.pdf'), 'pedido.pdf')
@@ -86,7 +106,7 @@ describe('tabelas', () => {
 describe('erros claros', () => {
   it('recusa formatos não suportados e documentos sem lista', async () => {
     await expect(lerDocumento(Buffer.from('x'), 'antigo.doc')).rejects.toThrow('Formato antigo')
-    await expect(lerDocumento(Buffer.from('x'), 'foto.jpg')).rejects.toThrow('PDF, Word')
+    await expect(lerDocumento(Buffer.from('x'), 'foto.jpg')).rejects.toThrow('Envie um arquivo PDF')
     await expect(lerDocumento(Buffer.from('não é zip'), 'lista.docx')).rejects.toThrow('Word inválido')
     await expect(lerDocumento(Buffer.from('%PDF-1.4 lixo'), 'nota.pdf')).rejects.toThrow()
     const semTabela = await writeXlsxFile([[{ value: 'Olá' }], [{ value: 'mundo' }]]).toBuffer()

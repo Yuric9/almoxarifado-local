@@ -87,21 +87,22 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
   return (
     <Modal
       titulo="Importar documento"
-      descricao={doc ? undefined : 'Leia uma nota fiscal (DANFE), pedido ou lista de materiais em PDF, Word ou Excel.'}
+      descricao={doc ? undefined : 'Leia uma nota fiscal (XML ou DANFE em PDF), pedido ou lista de materiais em Word ou Excel.'}
       aoFechar={aoFechar}
       largura={doc ? 'max-w-6xl' : 'max-w-xl'}
     >
       {!doc ? (
         <div className="space-y-4">
-          <input ref={arquivo} id="arquivo-documento" type="file" accept=".pdf,.docx,.xlsx,.csv" className="sr-only"
+          <input ref={arquivo} id="arquivo-documento" type="file" accept=".xml,.pdf,.docx,.xlsx,.csv" className="sr-only"
             onChange={e => setNomeArquivo(e.target.files?.[0]?.name || '')} />
           <label htmlFor="arquivo-documento" className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-6 py-8 text-center text-sm text-slate-600 hover:bg-slate-50">
             <Upload size={24} className="text-slate-400" />
             <span className="font-medium text-slate-900">{nomeArquivo || 'Escolher arquivo'}</span>
-            <span>PDF (nota fiscal, pedido) · Word (.docx) · Excel (.xlsx, .csv)</span>
+            <span>XML da NF-e · PDF (nota fiscal, pedido) · Word (.docx) · Excel (.xlsx, .csv)</span>
           </label>
           <ul className="list-inside list-disc space-y-1 text-xs text-slate-500">
             <li>O documento precisa ter uma tabela com colunas como <b>Descrição</b>, <b>Quantidade</b> e <b>Unidade</b>, ou ser uma nota fiscal DANFE.</li>
+            <li>Tem o <b>XML da nota</b>? Prefira ele: a leitura é exata, sem depender do layout do PDF.</li>
             <li>PDF escaneado (foto/imagem) não tem texto para ler. Use o PDF original enviado pelo fornecedor.</li>
             <li>Nada é gravado antes de você conferir os itens na próxima etapa.</li>
           </ul>
@@ -116,7 +117,7 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
       ) : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <Badge tom="azul">{doc.tipo === 'nfe' ? 'Nota fiscal (DANFE)' : `Tabela · ${doc.formato.toUpperCase()}`}</Badge>
+            <Badge tom="azul">{doc.tipo === 'nfe' ? (doc.formato === 'xml' ? 'Nota fiscal (XML)' : 'Nota fiscal (DANFE)') : `Tabela · ${doc.formato.toUpperCase()}`}</Badge>
             {doc.numero && <span className="text-slate-700">Nº <b>{doc.numero}</b></span>}
             {doc.fornecedor && <span className="text-slate-700">· {doc.fornecedor}</span>}
             {doc.data && <span className="text-slate-500">· {doc.data}</span>}
