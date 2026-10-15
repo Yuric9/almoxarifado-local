@@ -3,7 +3,7 @@ import { getDb } from './db'
 import { lerArquivoPlanilha, numeroCelula } from './planilha'
 
 /**
- * Leitura de documentos (PDF, Word e Excel) para importar materiais.
+ * Leitura de documentos (PDF, XML da NF-e, Word e Excel) para importar materiais.
  *
  * O resultado é sempre uma lista de itens para o usuário conferir na tela
  * antes de qualquer gravação. Nada aqui altera o banco.
@@ -21,7 +21,7 @@ export type Sugestao = { produto_id: number; nome: string; unidade: string; moti
 
 export type DocumentoLido = {
   tipo: 'nfe' | 'tabela'
-  formato: 'pdf' | 'docx' | 'xlsx' | 'csv'
+  formato: 'pdf' | 'xml' | 'docx' | 'xlsx' | 'csv'
   numero: string | null
   fornecedor: string | null
   data: string | null
@@ -317,9 +317,71 @@ export function sugerirMaterial(item: Pick<ItemLido, 'codigo' | 'descricao'>): S
   return melhor ? { produto_id: melhor.produto.id, nome: melhor.produto.nome, unidade: melhor.produto.unidade, motivo: 'semelhante' } : null
 }
 
-/* ------------------------------------------------------------------ entrada principal */
-
 const LIMITE_ITENS = 500
+
+/* ------------------------------------------------------------------ XML da NF-e */
+
+const ENTIDADES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }
+
+function textoXml(valor: string) {
+  return valor
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (inteiro, ent: string) => {
+      if (ent[0] === '#') return String.fromCodePoint(ent[1].toLowerCase() === 'x' ? parseInt(ent.slice(2), 16) : parseInt(ent.slice(1), 10))
+      return ENTIDADES[ent.toLowerCase()] ?? inteiro
+    })
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Conteúdo da primeira tag com esse nome (aceita prefixo de namespace, ex.: <nfe:xProd>). */
+function tag(xml: string, nome: string) {
+  const m = xml.match(new RegExp(`<(?:\\w+:)?${nome}(?:\\s[^>]*)?>([\\s\\S]*?)</(?:\\w+:)?${nome}>`))
+  return m ? textoXml(m[1]) : null
+}
+
+function blocos(xml: string, nome: string) {
+  return Array.from(xml.matchAll(new RegExp(`<(?:\\w+:)?${nome}(?:\\s[^>]*)?>([\\s\\S]*?)</(?:\\w+:)?${nome}>`, 'g')), m => m[1])
+}
+
+/** No XML os números usam ponto decimal (ex.: 6.5000), diferente do PDF. */
+function numeroXml(valor: string | null) {
+  if (!valor) return null
+  const n = Number(valor)
+  return Number.isFinite(n) ? n : null
+}
+
+export function lerXmlNfe(conteudo: Buffer): Omit<DocumentoLido, 'avisos' | 'itens'> & { itens: ItemLido[] } {
+  const xml = conteudo.toString('utf8').replace(/^\uFEFF/, '')
+  if (!/<(?:\w+:)?infNFe[\s>]/.test(xml)) {
+    if (/<(?:\w+:)?resNFe[\s>]/.test(xml)) throw new Error('Este XML é apenas o resumo da nota (sem os itens). Baixe o XML completo da NF-e.')
+    throw new Error('Este XML não é de uma nota fiscal eletrônica (NF-e).')
+  }
+  const ide = blocos(xml, 'ide')[0] ?? ''
+  const emit = blocos(xml, 'emit')[0] ?? ''
+  const emissao = tag(ide, 'dhEmi') || tag(ide, 'dEmi')
+  const data = emissao?.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  const itens = blocos(xml, 'det').map(det => {
+    const prod = blocos(det, 'prod')[0] ?? det
+    return {
+      codigo: tag(prod, 'cProd'),
+      descricao: tag(prod, 'xProd') || '',
+      unidade: normalizarUnidade(tag(prod, 'uCom')),
+      quantidade: numeroXml(tag(prod, 'qCom')),
+      valor_unitario: numeroXml(tag(prod, 'vUnCom'))
+    }
+  }).filter(i => i.descricao)
+  return {
+    tipo: 'nfe',
+    formato: 'xml',
+    numero: tag(ide, 'nNF'),
+    fornecedor: tag(emit, 'xNome'),
+    data: data ? `${data[3]}/${data[2]}/${data[1]}` : null,
+    itens
+  }
+}
+
+/* ------------------------------------------------------------------ entrada principal */
 
 export async function lerDocumento(conteudo: Buffer, nomeArquivo: string): Promise<DocumentoLido> {
   const nome = nomeArquivo.toLowerCase()
@@ -342,6 +404,8 @@ export async function lerDocumento(conteudo: Buffer, nomeArquivo: string): Promi
       base = { ...base, tipo: 'tabela', itens: lerTabelaPdf(linhas) }
       if (base.itens.length) avisos.push('A nota não seguiu o layout padrão do DANFE; os itens foram lidos pela tabela. Confira com atenção.')
     }
+  } else if (nome.endsWith('.xml')) {
+    base = lerXmlNfe(conteudo)
   } else if (nome.endsWith('.docx')) {
     const tabelas = tabelasDoDocx(conteudo)
     const itens = tabelas.map(itensDeTabela).sort((a, b) => b.length - a.length)[0] || []
@@ -353,7 +417,7 @@ export async function lerDocumento(conteudo: Buffer, nomeArquivo: string): Promi
   } else if (nome.endsWith('.doc') || nome.endsWith('.xls')) {
     throw new Error('Formato antigo do Office não é suportado. Abra o arquivo no Word/Excel e use "Salvar como" .docx ou .xlsx.')
   } else {
-    throw new Error('Envie um arquivo PDF, Word (.docx) ou Excel (.xlsx/.csv)')
+    throw new Error('Envie um arquivo PDF, XML da NF-e, Word (.docx) ou Excel (.xlsx/.csv)')
   }
 
   if (!base.itens.length) {

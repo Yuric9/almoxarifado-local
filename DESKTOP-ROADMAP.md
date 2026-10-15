@@ -12,7 +12,7 @@
 - [x] Instalador NSIS, `.exe` portátil e ZIP para HD (Windows x64)
 - [x] Modo portátil: dados ao lado do executável (`Almoxarifado-Dados`)
 - [x] Build do CI corrigido (SQLite era recompilado para o Electron antes do `next build`)
-- [ ] Ícone próprio do aplicativo (`build/icon.ico`)
+- [x] Ícone próprio do aplicativo (`build/icon.ico`, gerado de `build/icon.svg`)
 - [ ] Assinatura digital do executável
 
 ## Etapa 3 — Operação
@@ -28,7 +28,7 @@
 - [x] Configurações: tema claro/escuro, empresa, padrões e categorias
 - [x] Importar nota fiscal (DANFE), pedido ou lista em PDF, Word ou Excel
 - [ ] Leitura de PDF escaneado (OCR)
-- [ ] Importar o XML da NF-e (mais preciso que o PDF)
+- [x] Importar o XML da NF-e (mais preciso que o PDF)
 - [ ] Usuários e permissões (login)
 - [ ] Cadastro de fornecedores e pedidos de compra
 - [ ] Migrar para Next.js 15 (alertas de segurança do Next 14 em recursos não usados pelo app)
