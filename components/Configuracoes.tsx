@@ -149,6 +149,9 @@ function GerenciarCategorias({ categorias, aoAlterar, notificar }: { categorias:
         <SeletorCor valor={nova.cor} aoMudar={cor => setNova({ ...nova, cor })} />
         <Botao type="submit" variante="primario" icone={<Plus size={16} />}>Adicionar</Botao>
       </form>
+      <p className="border-b border-slate-200 px-3 py-2 text-xs text-slate-500">
+        Categorias repetidas (ex.: “MATERIAL ELETRICO” e “Elétrica”)? Edite uma e dê a ela o nome da outra: o sistema oferece juntar as duas.
+      </p>
       <Tabela colunas={[{ titulo: 'Categoria' }, { titulo: 'Materiais', alinhar: 'direita' }, { titulo: '', largura: 'w-24' }]} vazio="Nenhuma categoria.">
         {categorias.map(c => editando?.id === c.id ? (
           <tr key={c.id}>
@@ -161,7 +164,12 @@ function GerenciarCategorias({ categorias, aoAlterar, notificar }: { categorias:
             <td className={`${celula} text-right`}>
               <div className="flex justify-end gap-1">
                 <button aria-label="Salvar" title="Salvar" className="rounded p-1.5 text-emerald-700 hover:bg-slate-100"
-                  onClick={async () => { if (await executar(() => api(`/api/categorias/${c.id}`, { method: 'PATCH', json: editando }), 'Categoria atualizada')) setEditando(null) }}>
+                  onClick={async () => {
+                    const outra = categorias.find(o => o.id !== c.id && o.nome.toLocaleLowerCase('pt-BR') === editando.nome.trim().toLocaleLowerCase('pt-BR'))
+                    if (outra && !window.confirm(`Já existe a categoria "${outra.nome}". Juntar as duas? Os ${c.total_materiais} material(is) de "${c.nome}" passam para "${outra.nome}" e "${c.nome}" é excluída.`)) return
+                    const mensagem = outra ? `"${c.nome}" juntada em "${outra.nome}"` : 'Categoria atualizada'
+                    if (await executar(() => api(`/api/categorias/${c.id}`, { method: 'PATCH', json: { ...editando, juntar: !!outra } }), mensagem)) setEditando(null)
+                  }}>
                   <Check size={16} />
                 </button>
                 <button aria-label="Cancelar" title="Cancelar" className="rounded p-1.5 text-slate-500 hover:bg-slate-100" onClick={() => setEditando(null)}><X size={16} /></button>

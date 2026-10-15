@@ -1,7 +1,8 @@
 import { readSheet } from 'read-excel-file/node'
 import writeXlsxFile from 'write-excel-file/node'
+import { obterOuCriarCategoria, separarUnidade } from './classificacao'
 import { getDb } from './db'
-import { ajustarEstoque, atualizarProduto, criarCategoria, criarProduto, listarCategorias, listarProdutos } from './repository'
+import { ajustarEstoque, atualizarProduto, categoriaAutomatica, criarProduto, listarProdutos } from './repository'
 
 type Celula = string | number | boolean | Date | null
 
@@ -142,7 +143,6 @@ export function importarMateriais(linhas: Celula[][], opcoes: { ajustarQuantidad
 
   const db = getDb()
   const resultado: ResultadoImportacao = { criados: 0, atualizados: 0, ajustados: 0, erros: [] }
-  const categorias = new Map(listarCategorias().map(c => [c.nome.toLocaleLowerCase('pt-BR'), c.id]))
   const valor = (linha: Celula[], campo: string) => (indice[campo] === undefined ? undefined : linha[indice[campo]] ?? null)
 
   db.transaction(() => {
@@ -156,17 +156,18 @@ export function importarMateriais(linhas: Celula[][], opcoes: { ajustarQuantidad
 
           let categoriaId: number | null | undefined
           const nomeCategoria = textoCelula(valor(linha, 'categoria') ?? null)
-          if (nomeCategoria) {
-            const chave = nomeCategoria.toLocaleLowerCase('pt-BR')
-            if (!categorias.has(chave)) categorias.set(chave, criarCategoria({ nome: nomeCategoria }))
-            categoriaId = categorias.get(chave)
-          }
+          // "MATERIAL ELETRICO" e "Elétrica" viram a mesma categoria.
+          if (nomeCategoria) categoriaId = obterOuCriarCategoria(nomeCategoria)
+
+          // Planilhas antigas às vezes trazem a categoria junto da unidade ("MATERIAL ELETRICO PAR").
+          const unidadeLida = separarUnidade(textoCelula(valor(linha, 'unidade') ?? null))
+          if (unidadeLida.categoria && categoriaId === undefined) categoriaId = obterOuCriarCategoria(unidadeLida.categoria)
 
           const dados = {
             nome,
             codigo: indice.codigo === undefined ? undefined : codigo,
             categoria_id: categoriaId,
-            unidade: textoCelula(valor(linha, 'unidade') ?? null) || undefined,
+            unidade: unidadeLida.unidade || undefined,
             minimo: valor(linha, 'minimo') === undefined ? undefined : numeroCelula(valor(linha, 'minimo') ?? null) ?? undefined,
             localizacao: indice.localizacao === undefined ? undefined : textoCelula(valor(linha, 'localizacao') ?? null)
           }
@@ -185,7 +186,7 @@ export function importarMateriais(linhas: Celula[][], opcoes: { ajustarQuantidad
               resultado.ajustados++
             }
           } else {
-            criarProduto({ ...dados, quantidade: quantidade ?? 0 })
+            criarProduto({ ...dados, categoria_id: dados.categoria_id ?? categoriaAutomatica(nome), quantidade: quantidade ?? 0 })
             resultado.criados++
           }
         })()

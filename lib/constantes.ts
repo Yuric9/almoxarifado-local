@@ -1,6 +1,6 @@
 // Constantes compartilhadas entre servidor e interface (sem dependências de servidor).
 
-export const UNIDADES = ['UN', 'KG', 'G', 'CX', 'PCT', 'PAR', 'L', 'ML', 'M', 'M²', 'M³', 'RL', 'SC', 'LT', 'GL'] as const
+export const UNIDADES = ['UN', 'PC', 'PAR', 'CJ', 'KG', 'G', 'CX', 'PCT', 'PT', 'L', 'ML', 'M', 'M²', 'M³', 'RL', 'SC', 'LT', 'GL', 'BL', 'BR', 'MIL'] as const
 
 export const MOTIVOS_BAIXA = {
   PERDA: 'Perda',
@@ -27,4 +27,18 @@ export function descreverOrigem(m: { origem: string; motivo: string | null }) {
   const base = ORIGENS[m.origem] || m.origem
   if (m.origem === 'BAIXA' && m.motivo) return `${base} · ${MOTIVOS_BAIXA[m.motivo as MotivoBaixa] || m.motivo}`
   return base
+}
+
+/** Grafias comuns de unidade → sigla do sistema (UND → UN, M3 → M³, SACO → SC…). */
+const UNIDADES_EQUIVALENTES: Record<string, string> = {
+  UND: 'UN', UNID: 'UN', UNIDADE: 'UN', UNIDADES: 'UN', U: 'UN', UNI: 'UN',
+  M3: 'M³', M2: 'M²', MT: 'M', MTS: 'M', METRO: 'M', METROS: 'M',
+  SACO: 'SC', SACOS: 'SC', CAIXA: 'CX', CXS: 'CX', PACOTE: 'PCT', PC: 'PC', PÇ: 'PC', PECA: 'PC', PEÇA: 'PC',
+  LITRO: 'L', LITROS: 'L', LT: 'L', KILO: 'KG', QUILO: 'KG', KGS: 'KG', ROLO: 'RL', GALAO: 'GL', GALÃO: 'GL', PARES: 'PAR', BARRA: 'BR', BARRAS: 'BR'
+}
+
+export function normalizarUnidade(valor: string | null | undefined) {
+  const u = String(valor ?? '').trim().toUpperCase().replace(/\.$/, '')
+  if (!u) return null
+  return UNIDADES_EQUIVALENTES[u] ?? u
 }

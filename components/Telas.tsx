@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ArrowDownToLine, ArrowUpFromLine, ChevronRight, FileSpreadsheet, FileText, FileUp, PackageMinus, Plus, Search } from 'lucide-react'
+import { ArrowDownToLine, ArrowUpFromLine, ChevronRight, FileSpreadsheet, FileText, FileUp, PackageMinus, Plus, Search, Tags } from 'lucide-react'
 import { api, ehHoje, formatarData, formatarQtd, mensagemErro } from '@/lib/cliente'
 import { descreverOrigem, type CategoriaResumo, type Movimentacao, type Produto, type RequisicaoResumo, type ReservaResumo } from '@/lib/tipos'
 import { Badge, Botao, CabecalhoPagina, Painel, Tabela, celula, celulaNumero, classeCampo } from './ui'
@@ -110,7 +110,7 @@ export function TelaPainel({ produtos, movs, reservas, acoes, navegar, abrirMate
 
 /* ------------------------------------------------------------------ materiais */
 
-export function TelaMateriais({ produtos, categorias, carregando, filtroAlerta, aoNovo, aoEntrada, aoBaixa, aoPlanilhas, aoImportarDocumento, abrirMaterial }: {
+export function TelaMateriais({ produtos, categorias, carregando, filtroAlerta, aoNovo, aoEntrada, aoBaixa, aoPlanilhas, aoImportarDocumento, aoClassificar, abrirMaterial }: {
   produtos: Produto[]
   categorias: CategoriaResumo[]
   carregando: boolean
@@ -120,6 +120,7 @@ export function TelaMateriais({ produtos, categorias, carregando, filtroAlerta, 
   aoBaixa: () => void
   aoPlanilhas: () => void
   aoImportarDocumento: () => void
+  aoClassificar: () => void
   abrirMaterial: (id: number) => void
 }) {
   const [busca, setBusca] = useState('')
@@ -144,6 +145,7 @@ export function TelaMateriais({ produtos, categorias, carregando, filtroAlerta, 
         titulo="Materiais"
         descricao="Clique em um material para ver a ficha, editar, dar baixa ou ajustar o estoque"
         acoes={<>
+          <Botao onClick={aoClassificar} icone={<Tags size={16} />}>Classificar</Botao>
           <Botao onClick={aoImportarDocumento} icone={<FileUp size={16} />}>Importar documento</Botao>
           <Botao onClick={aoPlanilhas} icone={<FileSpreadsheet size={16} />}>Planilhas</Botao>
           <Botao onClick={aoBaixa} icone={<PackageMinus size={16} />}>Dar baixa</Botao>

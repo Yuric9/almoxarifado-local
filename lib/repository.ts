@@ -1,3 +1,4 @@
+import { classificarNome, obterOuCriarCategoria } from './classificacao'
 import { lerConfiguracoes } from './configuracoes'
 import { MOTIVOS_BAIXA, type MotivoBaixa } from './constantes'
 import { getDb } from './db'
@@ -145,15 +146,28 @@ export function criarCategoria(input: { nome: unknown; cor?: unknown }) {
   return Number(db.prepare('INSERT INTO categorias (nome, cor) VALUES (?, ?)').run(nome, corValida(input.cor)).lastInsertRowid)
 }
 
-export function atualizarCategoria(id: number, input: { nome?: unknown; cor?: unknown }) {
+/**
+ * Renomeia a categoria. Se o novo nome já for de outra categoria e `juntar` for verdadeiro,
+ * os materiais passam para essa outra e esta é excluída (ex.: "MATERIAL ELETRICO" → "Elétrica").
+ */
+export function atualizarCategoria(id: number, input: { nome?: unknown; cor?: unknown; juntar?: unknown }) {
   const db = getDb()
   const atual = db.prepare('SELECT * FROM categorias WHERE id=?').get(id) as Categoria | undefined
   if (!atual) throw new Error('Categoria não encontrada')
   const nome = input.nome === undefined ? atual.nome : texto(input.nome)
   if (!nome) throw new Error('Informe o nome da categoria')
-  if (db.prepare('SELECT 1 FROM categorias WHERE nome=? COLLATE NOCASE AND id<>?').get(nome, id)) throw new Error(`A categoria "${nome}" já existe`)
+  const outra = db.prepare('SELECT id, nome FROM categorias WHERE nome=? COLLATE NOCASE AND id<>?').get(nome, id) as Categoria | undefined
+  if (outra) {
+    if (input.juntar !== true) throw new Error(`A categoria "${outra.nome}" já existe`)
+    db.transaction(() => {
+      db.prepare('UPDATE produtos SET categoria_id=? WHERE categoria_id=?').run(outra.id, id)
+      db.prepare('DELETE FROM categorias WHERE id=?').run(id)
+    })()
+    return { juntada_em: outra.id }
+  }
   const cor = input.cor === undefined ? atual.cor : corValida(input.cor)
   db.prepare('UPDATE categorias SET nome=?, cor=? WHERE id=?').run(nome, cor, id)
+  return { juntada_em: null }
 }
 
 export function excluirCategoria(id: number) {
@@ -365,8 +379,19 @@ export type ItemImportacao = {
   nome?: unknown
   codigo?: unknown
   unidade?: unknown
+  /** Id da categoria, ou "auto" para o sistema classificar pelo nome. */
   categoria_id?: unknown
   quantidade?: unknown
+}
+
+/** "auto": usa a categoria sugerida pelo nome, se a sugestão for confiável (senão fica sem categoria). */
+export function categoriaAutomatica(nome: unknown) {
+  const sugestao = texto(nome) ? classificarNome(texto(nome)!) : null
+  return sugestao && sugestao.confianca !== 'baixa' ? obterOuCriarCategoria(sugestao.categoria) : null
+}
+
+function categoriaDoItem(item: ItemImportacao) {
+  return item.categoria_id === 'auto' ? categoriaAutomatica(item.nome) : item.categoria_id
 }
 
 /**
@@ -391,7 +416,7 @@ export function aplicarImportacao(input: { modo: unknown; itens: unknown; observ
           if (!p) throw new Error('material não encontrado')
           if (!p.ativo) throw new Error('o material está inativo')
         } else {
-          produtoId = criarProduto({ nome: item.nome, codigo: item.codigo, unidade: item.unidade, categoria_id: item.categoria_id, quantidade: 0 })
+          produtoId = criarProduto({ nome: item.nome, codigo: item.codigo, unidade: item.unidade, categoria_id: categoriaDoItem(item), quantidade: 0 })
           resultado.criados++
         }
         if (modo === 'entrada') {

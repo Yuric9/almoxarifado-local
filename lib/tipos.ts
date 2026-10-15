@@ -4,6 +4,7 @@ export type { Configuracoes, Tema } from './configuracoes'
 export type { Relatorio } from './relatorios'
 export type { ResultadoImportacao } from './planilha'
 export type { DocumentoLido } from './documento'
+export type { ItemClassificacao, Sugestao as SugestaoCategoria } from './classificacao'
 export { UNIDADES, MOTIVOS_BAIXA, ORIGENS, descreverOrigem, type MotivoBaixa } from './constantes'
 import type { Categoria, ItemDocumento, Movimentacao, Produto, Requisicao, Reserva, StatusReserva } from './repository'
 

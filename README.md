@@ -16,6 +16,7 @@ Feito com Next.js 14, React 18, Tailwind CSS, SQLite (`better-sqlite3`) e Electr
 - **Relatórios** diários, mensais ou por período: totais, movimentação dia a dia, saldo inicial e final por material, retiradas e movimentações, com impressão e exportação em Excel e CSV.
 - **Planilhas**: exportar os materiais em Excel (.xlsx) ou CSV e importar em lote, com planilha modelo.
 - **Importar documento** (XML da NF-e, PDF, Word ou Excel): lê **notas fiscais (XML ou DANFE em PDF)**, pedidos e listas de materiais, sugere o material já cadastrado de cada item e, depois da sua conferência, dá entrada no estoque (com número da NF e fornecedor no histórico) ou apenas cadastra os materiais. PDFs escaneados (imagem) não têm texto e não podem ser lidos.
+- **Classificar materiais** (sem internet): sugere a categoria de cada material pelo nome, usando os materiais que você já classificou, palavras-chave (EPI, ferramentas, limpeza) e a **tabela de referência GOINFRA/AGETOP** (1.810 materiais de construção, elétrica e hidráulica). Corrige unidades que vieram com a categoria junto ("MATERIAL ELETRICO PAR" → Elétrica / PAR). Também sugere a categoria no cadastro e na importação. Para juntar categorias repetidas, renomeie uma com o nome da outra em Configurações.
 - **Configurações**: tema claro, escuro ou igual ao Windows; nome da empresa no comprovante; padrões; e categorias (criar, renomear, mudar cor e excluir).
 - **Backup automático diário**, backup manual e **restauração** pela própria tela.
 - Diferencia **estoque físico**, **reservado** e **disponível**. Uma retirada comum nunca consome material reservado.
@@ -80,6 +81,8 @@ lib/
   relatorios.ts          relatórios por período
   planilha.ts            importação e exportação de planilhas (.xlsx e .csv)
   documento.ts           leitura de notas fiscais (XML/PDF), pedidos e listas em Word e Excel
+  classificacao.ts       sugestão automática de categoria (regras + tabela de referência)
+  referencia/agetop.json tabela GOINFRA/AGETOP T250 abril/2024 (materiais, unidade, preço, grupo)
   configuracoes.ts       preferências salvas no banco
   backup.ts              backup, backup automático e restauração
   paths.ts               onde ficam banco e backups
