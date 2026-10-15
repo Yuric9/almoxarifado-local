@@ -36,7 +36,7 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
   const [modo, setModo] = useState<'entrada' | 'cadastro'>('entrada')
   const [observacao, setObservacao] = useState('')
   const [responsavel, setResponsavel] = useState('')
-  const [categoriaNovos, setCategoriaNovos] = useState('')
+  const [categoriaNovos, setCategoriaNovos] = useState('auto')
   const leitura = useEnvio()
   const gravacao = useEnvio()
 
@@ -75,7 +75,7 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
         nome: l.descricao,
         codigo: l.codigo,
         unidade: l.unidade,
-        categoria_id: categoriaNovos ? Number(categoriaNovos) : null,
+        categoria_id: categoriaNovos === 'auto' ? 'auto' : categoriaNovos ? Number(categoriaNovos) : null,
         quantidade: l.quantidade === '' ? null : Number(l.quantidade.replace(',', '.'))
       }))
       const r = await api<{ criados: number; entradas: number }>('/api/documentos/aplicar', { method: 'POST', json: { modo, itens, observacao, responsavel } })
@@ -190,6 +190,7 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
             </Campo>
             <Campo rotulo="Categoria dos novos">
               <select value={categoriaNovos} onChange={e => setCategoriaNovos(e.target.value)} className={classeInput} disabled={!novos}>
+                <option value="auto">Automática (pelo nome)</option>
                 <option value="">Sem categoria</option>
                 {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </select>

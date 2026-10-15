@@ -9,8 +9,7 @@ type Contexto = { params: { id: string } }
 export async function PATCH(req: Request, { params }: Contexto) {
   try {
     const body = await lerJson(req)
-    atualizarCategoria(idDaRota(params.id), { nome: body.nome, cor: body.cor })
-    return ok({ ok: true })
+    return ok({ ok: true, ...atualizarCategoria(idDaRota(params.id), { nome: body.nome, cor: body.cor, juntar: body.juntar }) })
   } catch (e) {
     return falha(e)
   }

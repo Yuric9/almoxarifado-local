@@ -29,6 +29,8 @@
 - [x] Importar nota fiscal (DANFE), pedido ou lista em PDF, Word ou Excel
 - [ ] Leitura de PDF escaneado (OCR)
 - [x] Importar o XML da NF-e (mais preciso que o PDF)
+- [x] Classificação automática de materiais pela tabela GOINFRA/AGETOP
+- [ ] Atualizar a tabela de referência importando a planilha nova da GOINFRA ou do SINAPI
 - [ ] Usuários e permissões (login)
 - [ ] Cadastro de fornecedores e pedidos de compra
 - [ ] Migrar para Next.js 15 (alertas de segurança do Next 14 em recursos não usados pelo app)

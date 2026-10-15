@@ -14,6 +14,7 @@ import { Comprovante } from '@/components/Comprovante'
 import { TelaConfiguracoes } from '@/components/Configuracoes'
 import { EntradaModal, RequisicaoModal, ReservaModal, RetirarReservaModal } from '@/components/Formularios'
 import { BaixaModal, FichaMaterial, MaterialFormModal } from '@/components/Material'
+import { ClassificarModal } from '@/components/Classificar'
 import { ImportarDocumentoModal } from '@/components/ImportarDocumento'
 import { PlanilhasModal } from '@/components/Planilhas'
 import { TelaRelatorios } from '@/components/Relatorios'
@@ -22,7 +23,7 @@ import { TelaMateriais, TelaMovimentacoes, TelaPainel, TelaReservas, TelaRetirad
 import { Botao } from '@/components/ui'
 
 type Tela = 'painel' | 'materiais' | 'retiradas' | 'reservas' | 'movimentacoes' | 'relatorios' | 'backup' | 'configuracoes'
-type Janela = 'entrada' | 'novo' | 'requisicao' | 'reserva' | 'baixa' | 'planilhas' | 'documento' | null
+type Janela = 'entrada' | 'novo' | 'requisicao' | 'reserva' | 'baixa' | 'planilhas' | 'documento' | 'classificar' | null
 type Aviso = { texto: string; erro?: boolean }
 
 const MENU: Array<{ id: Tela; rotulo: string; icone: LucideIcon }> = [
@@ -209,7 +210,7 @@ export default function Home() {
             )}
             {tela === 'materiais' && (
               <TelaMateriais produtos={produtos} categorias={categorias} carregando={carregando} filtroAlerta={filtroAlerta}
-                aoNovo={() => setJanela('novo')} aoEntrada={() => setJanela('entrada')} aoBaixa={() => setJanela('baixa')} aoPlanilhas={() => setJanela('planilhas')} aoImportarDocumento={() => setJanela('documento')} abrirMaterial={setMaterialAberto} />
+                aoNovo={() => setJanela('novo')} aoEntrada={() => setJanela('entrada')} aoBaixa={() => setJanela('baixa')} aoPlanilhas={() => setJanela('planilhas')} aoImportarDocumento={() => setJanela('documento')} aoClassificar={() => setJanela('classificar')} abrirMaterial={setMaterialAberto} />
             )}
             {tela === 'retiradas' && <TelaRetiradas requisicoes={requisicoes} aoNova={() => setJanela('requisicao')} aoComprovante={abrirComprovante} />}
             {tela === 'reservas' && <TelaReservas reservas={reservas} aoNova={() => setJanela('reserva')} abrirReserva={setReservaAberta} />}
@@ -245,6 +246,7 @@ export default function Home() {
       {janela === 'reserva' && <ReservaModal produtos={produtosAtivos} aoFechar={fechar} aoConcluir={concluir} />}
       {janela === 'planilhas' && <PlanilhasModal aoFechar={fechar} aoImportar={alterado} />}
       {janela === 'documento' && <ImportarDocumentoModal produtos={produtosAtivos} categorias={categorias} aoFechar={fechar} aoConcluir={concluir} />}
+      {janela === 'classificar' && <ClassificarModal categorias={categorias} aoFechar={fechar} aoConcluir={concluir} />}
       {janela === 'requisicao' && (
         <RequisicaoModal produtos={produtosAtivos} entreguePorPadrao={config.entregue_por_padrao} aoFechar={fechar}
           aoConcluir={async id => { await concluir('Retirada registrada'); await abrirComprovante(id) }} />

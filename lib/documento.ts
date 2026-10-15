@@ -1,5 +1,6 @@
 import { unzipSync, strFromU8 } from 'fflate'
 import { getDb } from './db'
+import { normalizarUnidade } from './constantes'
 import { lerArquivoPlanilha, numeroCelula } from './planilha'
 
 /**
@@ -37,18 +38,7 @@ const continuar = (inicio: string, resto: string) => (inicio.endsWith('-') ? ini
 const normalizar = (valor: unknown) =>
   String(valor ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
 
-const UNIDADES_EQUIVALENTES: Record<string, string> = {
-  UND: 'UN', UNID: 'UN', UNIDADE: 'UN', UNIDADES: 'UN', U: 'UN', UNI: 'UN',
-  M3: 'M³', M2: 'M²', MT: 'M', MTS: 'M', METRO: 'M', METROS: 'M',
-  SACO: 'SC', SACOS: 'SC', CAIXA: 'CX', CXS: 'CX', PACOTE: 'PCT', PC: 'PC', PÇ: 'PC', PECA: 'PC', PEÇA: 'PC',
-  LITRO: 'L', LITROS: 'L', LT: 'L', KILO: 'KG', QUILO: 'KG', KGS: 'KG', ROLO: 'RL', GALAO: 'GL', GALÃO: 'GL', PARES: 'PAR', BARRA: 'BR', BARRAS: 'BR'
-}
-
-export function normalizarUnidade(valor: string | null | undefined) {
-  const u = String(valor ?? '').trim().toUpperCase().replace(/\.$/, '')
-  if (!u) return null
-  return UNIDADES_EQUIVALENTES[u] ?? u
-}
+export { normalizarUnidade } from './constantes'
 
 function numero(valor: unknown): number | null {
   try {

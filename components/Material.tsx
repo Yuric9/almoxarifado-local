@@ -1,8 +1,8 @@
 'use client'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { ArrowDownToLine, ClipboardCheck, PackageMinus, Pencil, Plus, Power, Trash2 } from 'lucide-react'
+import { ArrowDownToLine, ClipboardCheck, PackageMinus, Pencil, Plus, Power, Tags, Trash2 } from 'lucide-react'
 import { api, formatarData, formatarQtd, mensagemErro } from '@/lib/cliente'
-import { MOTIVOS_BAIXA, UNIDADES, descreverOrigem, type CategoriaResumo, type Produto, type ProdutoFicha } from '@/lib/tipos'
+import { MOTIVOS_BAIXA, UNIDADES, descreverOrigem, type CategoriaResumo, type Produto, type ProdutoFicha, type SugestaoCategoria } from '@/lib/tipos'
 import { EntradaModal } from './Formularios'
 import { AvisoErro, Badge, Botao, Campo, Modal, ModalFormulario, Tabela, celula, celulaNumero, classeInput, useEnvio } from './ui'
 
@@ -28,9 +28,36 @@ export function MaterialFormModal({ produto, categorias, aoFechar, aoConcluir, a
     minimo: produto ? String(produto.estoque_minimo) : ''
   })
   const [novaCategoria, setNovaCategoria] = useState<string | null>(null)
+  const [sugestao, setSugestao] = useState<SugestaoCategoria | null>(null)
   const { enviando, erro, setErro, executar } = useEnvio()
   const campo = (nome: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [nome]: e.target.value })
   const unidades = UNIDADES.includes(form.unidade as (typeof UNIDADES)[number]) ? UNIDADES : [form.unidade, ...UNIDADES]
+
+  // Sugere a categoria pelo nome enquanto o material está sem categoria.
+  const semCategoria = !form.categoria_id
+  useEffect(() => {
+    if (!semCategoria || form.nome.trim().length < 3) { setSugestao(null); return }
+    let ativo = true
+    const espera = setTimeout(() => {
+      api<{ sugestao: SugestaoCategoria | null }>(`/api/classificacao?nome=${encodeURIComponent(form.nome)}`)
+        .then(r => { if (ativo) setSugestao(r.sugestao) })
+        .catch(() => { if (ativo) setSugestao(null) })
+    }, 400)
+    return () => { ativo = false; clearTimeout(espera) }
+  }, [form.nome, semCategoria])
+
+  async function usarSugestao(s: SugestaoCategoria) {
+    try {
+      let id = categorias.find(c => c.nome === s.categoria)?.id
+      if (!id) {
+        id = (await api<{ id: number }>('/api/categorias', { method: 'POST', json: { nome: s.categoria } })).id
+        await aoCriarCategoria()
+      }
+      setForm(f => ({ ...f, categoria_id: String(id) }))
+    } catch (e) {
+      setErro(mensagemErro(e))
+    }
+  }
 
   async function salvarCategoria() {
     try {
@@ -82,6 +109,12 @@ export function MaterialFormModal({ produto, categorias, aoFechar, aoConcluir, a
               {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
             </select>
           </Campo>
+          {semCategoria && sugestao && novaCategoria === null && (
+            <button type="button" onClick={() => usarSugestao(sugestao)} title={sugestao.detalhe}
+              className="mt-1 flex w-full items-center gap-1 text-left text-xs text-emerald-700 hover:underline">
+              <Tags size={12} className="shrink-0" /> Sugestão: <b>{sugestao.categoria}</b>{sugestao.confianca === 'baixa' ? ' (confira)' : ''} · usar
+            </button>
+          )}
           {novaCategoria === null ? (
             <button type="button" onClick={() => setNovaCategoria('')} className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:underline">
               <Plus size={12} /> Nova categoria
