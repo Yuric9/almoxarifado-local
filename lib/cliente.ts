@@ -30,6 +30,17 @@ export function formatarData(valor: string) {
   return lerData(valor).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
+/** "Hoje, 14:02", "Ontem, 09:15" ou a data completa: mais fácil de ler nas listas. */
+export function formatarDataCurta(valor: string) {
+  const data = lerData(valor)
+  const hora = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  const ontem = new Date()
+  ontem.setDate(ontem.getDate() - 1)
+  if (data.toDateString() === new Date().toDateString()) return `Hoje, ${hora}`
+  if (data.toDateString() === ontem.toDateString()) return `Ontem, ${hora}`
+  return formatarData(valor)
+}
+
 export function ehHoje(valor: string) {
   return lerData(valor).toDateString() === new Date().toDateString()
 }
