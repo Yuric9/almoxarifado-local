@@ -4,6 +4,7 @@ import { ArrowDownToLine, ClipboardCheck, PackageMinus, Pencil, Plus, Power, Tag
 import { api, formatarData, formatarQtd, mensagemErro } from '@/lib/cliente'
 import { MOTIVOS_BAIXA, UNIDADES, descreverOrigem, type CategoriaResumo, type Produto, type ProdutoFicha, type SugestaoCategoria } from '@/lib/tipos'
 import { EntradaModal } from './Formularios'
+import { SeletorMaterial } from './SeletorMaterial'
 import { AvisoErro, Badge, Botao, Campo, Modal, ModalFormulario, Tabela, celula, celulaNumero, classeInput, useEnvio } from './ui'
 
 type AoConcluir = (mensagem: string) => void | Promise<void>
@@ -175,10 +176,7 @@ export function BaixaModal({ produtos, produtoInicial, aoFechar, aoConcluir }: {
   return (
     <ModalFormulario titulo="Dar baixa" descricao="Retira do estoque material perdido, furtado, vencido ou danificado." aoFechar={aoFechar} aoEnviar={enviar} rotuloEnviar="Registrar baixa" enviando={enviando}>
       <Campo rotulo="Material">
-        <select value={form.produto_id} onChange={campo('produto_id')} className={classeInput}>
-          <option value="">Selecione…</option>
-          {produtos.map(x => <option key={x.id} value={x.id}>{x.nome} (disp. {formatarQtd(x.quantidade_disponivel)} {x.unidade})</option>)}
-        </select>
+        <SeletorMaterial produtos={produtos} valor={form.produto_id} aoMudar={id => setForm(f => ({ ...f, produto_id: id }))} mostrarDisponivel />
       </Campo>
       <div className="grid grid-cols-2 gap-3">
         <Campo rotulo="Motivo">
