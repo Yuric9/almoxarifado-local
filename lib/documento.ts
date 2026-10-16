@@ -1,5 +1,6 @@
 import { unzipSync, strFromU8 } from 'fflate'
 import { getDb } from './db'
+import { separarUnidade } from './classificacao'
 import { normalizarUnidade } from './constantes'
 import { lerArquivoPlanilha, numeroCelula } from './planilha'
 
@@ -14,6 +15,8 @@ export type ItemLido = {
   codigo: string | null
   descricao: string
   unidade: string | null
+  /** Texto de categoria que veio grudado na unidade (ex.: "MATERIAL ELETRICO" de "MATERIAL ELETRICO PAR"). */
+  categoria?: string | null
   quantidade: number | null
   valor_unitario: number | null
 }
@@ -420,5 +423,9 @@ export async function lerDocumento(conteudo: Buffer, nomeArquivo: string): Promi
   const semQuantidade = base.itens.filter(i => i.quantidade === null).length
   if (semQuantidade) avisos.push(`${semQuantidade} item(ns) sem quantidade reconhecida. Preencha na conferência.`)
 
-  return { ...base, avisos, itens: base.itens.map(i => ({ ...i, sugestao: sugerirMaterial(i) })) }
+  const itens = base.itens.map(i => {
+    const separada = i.unidade ? separarUnidade(i.unidade) : null
+    return separada?.categoria ? { ...i, unidade: separada.unidade, categoria: separada.categoria } : i
+  })
+  return { ...base, avisos, itens: itens.map(i => ({ ...i, sugestao: sugerirMaterial(i) })) }
 }

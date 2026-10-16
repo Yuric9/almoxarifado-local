@@ -10,6 +10,7 @@ type Linha = {
   descricao: string
   codigo: string
   unidade: string
+  categoria: string | null
   quantidade: string
   /** '' = criar material novo; caso contrário, id do material existente. */
   produto_id: string
@@ -66,6 +67,7 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
         descricao: i.descricao,
         codigo: i.codigo || '',
         unidade: i.unidade || 'UN',
+        categoria: i.categoria ?? null,
         quantidade: i.quantidade === null ? '' : String(i.quantidade),
         produto_id: i.sugestao ? String(i.sugestao.produto_id) : '',
         motivo: i.sugestao?.motivo || null
@@ -101,6 +103,7 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
         codigo: l.codigo,
         unidade: l.unidade,
         categoria_id: categoriaNovos === 'auto' ? 'auto' : categoriaNovos ? Number(categoriaNovos) : null,
+        categoria: l.categoria,
         quantidade: l.quantidade === '' ? null : Number(l.quantidade.replace(',', '.'))
       }))
       const r = await api<{ criados: number; entradas: number; ajustados: number; iguais: number }>('/api/documentos/aplicar', { method: 'POST', json: { modo, itens, observacao, responsavel } })

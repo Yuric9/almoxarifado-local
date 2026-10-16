@@ -4,7 +4,8 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { fecharBanco } from '@/lib/db'
 import * as repo from '@/lib/repository'
-import { aplicarClassificacao, classificarMateriais, classificarNome, nomeCanonico, separarUnidade } from '@/lib/classificacao'
+import { aplicarClassificacao, classificarMateriais, classificarNome, corrigirUnidadesGrudadas, nomeCanonico, separarUnidade } from '@/lib/classificacao'
+import { itensDeTabela } from '@/lib/documento'
 import { importarMateriais } from '@/lib/planilha'
 
 let pasta: string
@@ -79,6 +80,28 @@ describe('categoria grudada na unidade', () => {
     const [a, b] = repo.listarProdutos()
     expect(a).toMatchObject({ nome: 'ABRAÇADEIRA 260', unidade: 'PAR', categoria: 'Elétrica' })
     expect(b).toMatchObject({ nome: 'ADITIVO SIKA', unidade: 'BL', categoria: 'Construção civil' })
+  })
+})
+
+describe('correção automática da unidade grudada', () => {
+  it('separa a unidade dos materiais já gravados e só preenche a categoria se estiver vazia', () => {
+    const eletrica = repo.listarCategorias().find(c => c.nome === 'Elétrica')!.id
+    const com = repo.criarProduto({ nome: 'Abraçadeira 260', unidade: 'MATERIAL ELETRICO PAR', categoria_id: eletrica })
+    const sem = repo.criarProduto({ nome: 'Acabamento válvula', unidade: 'CONSTRUÇÃO CIVIL UN' })
+    const normal = repo.criarProduto({ nome: 'Cabo', unidade: 'M' })
+    expect(corrigirUnidadesGrudadas()).toBe(2)
+    const porId = Object.fromEntries(repo.listarProdutos().map(p => [p.id, p]))
+    expect(porId[com]).toMatchObject({ unidade: 'PAR', categoria: 'Elétrica' })
+    expect(porId[sem]).toMatchObject({ unidade: 'UN', categoria: 'Construção civil' })
+    expect(porId[normal]).toMatchObject({ unidade: 'M', categoria: null })
+    expect(corrigirUnidadesGrudadas()).toBe(0)
+  })
+
+  it('importar documento separa a unidade e usa a categoria do arquivo no modo automático', () => {
+    const [item] = itensDeTabela([['Descrição', 'Unidade', 'Quantidade'], ['Abraçadeira copo 1/2', 'MATERIAL ELETRICO PC', 5]])
+    expect(item).toMatchObject({ unidade: 'MATERIAL ELETRICO PC' })
+    repo.aplicarImportacao({ modo: 'entrada', itens: [{ nome: 'Abraçadeira copo 1/2', unidade: 'PC', categoria: 'MATERIAL ELETRICO', categoria_id: 'auto', quantidade: 5 }] })
+    expect(repo.listarProdutos()[0]).toMatchObject({ unidade: 'PC', categoria: 'Elétrica', quantidade_atual: 5 })
   })
 })
 

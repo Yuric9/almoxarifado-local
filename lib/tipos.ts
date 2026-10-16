@@ -1,7 +1,7 @@
 // Tipos compartilhados entre API e interface (sem dependências de servidor).
 export type { Categoria, Produto, Movimentacao, Requisicao, Reserva, ItemDocumento, StatusReserva } from './repository'
 export type { Configuracoes, Tema } from './configuracoes'
-export type { Relatorio } from './relatorios'
+export type { Relatorio, LinhaEstoque } from './relatorios'
 export type { ResultadoImportacao } from './planilha'
 export type { DocumentoLido } from './documento'
 export type { ItemClassificacao, Sugestao as SugestaoCategoria } from './classificacao'

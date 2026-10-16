@@ -146,9 +146,6 @@ export function TelaMateriais({ produtos, categorias, carregando, filtroAlerta, 
     )
   }, [produtos, busca, categoria, soAlerta, inativos])
 
-  // Coluna "Local" só aparece se alguém usa localização.
-  const temLocal = produtos.some(p => p.localizacao)
-
   return (
     <>
       <CabecalhoPagina
@@ -187,8 +184,8 @@ export function TelaMateriais({ produtos, categorias, carregando, filtroAlerta, 
         </div>
         <Tabela
           colunas={[
-            { titulo: 'Material' }, { titulo: 'Categoria', largura: 'w-44' }, ...(temLocal ? [{ titulo: 'Local', largura: 'w-40' }] : []),
-            { titulo: 'Estoque', alinhar: 'direita', largura: 'w-40' }, { titulo: 'Mínimo', alinhar: 'direita', largura: 'w-24' }, { titulo: 'Situação', largura: 'w-40' }
+            { titulo: 'Material' }, { titulo: 'Quantidade', alinhar: 'direita', largura: 'w-36' }, { titulo: 'Unidade', largura: 'w-28' },
+            { titulo: 'Categoria', largura: 'w-48' }, { titulo: 'Situação', largura: 'w-40' }
           ]}
           vazio={carregando ? 'Carregando…' : produtos.length === 0 ? 'Nenhum material cadastrado. Use "Novo material" ou importe uma planilha.' : 'Nenhum material encontrado com esses filtros.'}
         >
@@ -198,13 +195,12 @@ export function TelaMateriais({ produtos, categorias, carregando, filtroAlerta, 
                 <span className="font-medium text-slate-900">{p.nome}</span>
                 {p.codigo && <span className="ml-2 font-mono text-xs text-slate-400">{p.codigo}</span>}
               </td>
-              <td className={`${celula} text-slate-600`}>{p.categoria || <span className="text-slate-400">—</span>}</td>
-              {temLocal && <td className={`${celula} text-slate-600`}>{p.localizacao || <span className="text-slate-400">—</span>}</td>}
               <td className={celulaNumero}>
-                <span className="font-medium text-slate-900">{formatarQtd(p.quantidade_atual)}</span> <span className="text-xs text-slate-500">{p.unidade}</span>
-                {p.quantidade_reservada > 0 && <span className="block text-xs text-amber-700">{formatarQtd(p.quantidade_reservada)} reservado · {formatarQtd(p.quantidade_disponivel)} livre</span>}
+                <span className="font-medium text-slate-900">{formatarQtd(p.quantidade_atual)}</span>
+                {p.quantidade_reservada > 0 && <span className="block text-xs text-amber-700">{formatarQtd(p.quantidade_reservada)} reservado</span>}
               </td>
-              <td className={`${celulaNumero} text-slate-500`}>{formatarQtd(p.estoque_minimo)}</td>
+              <td className={`${celula} whitespace-nowrap text-slate-600`}>{p.unidade}</td>
+              <td className={`${celula} text-slate-600`}>{p.categoria || <span className="text-slate-400">—</span>}</td>
               <td className={celula}>{situacao(p)}</td>
             </tr>
           ))}

@@ -381,6 +381,8 @@ export type ItemImportacao = {
   unidade?: unknown
   /** Id da categoria, ou "auto" para o sistema classificar pelo nome. */
   categoria_id?: unknown
+  /** Categoria escrita no próprio arquivo (usada no modo "auto"). */
+  categoria?: unknown
   quantidade?: unknown
 }
 
@@ -391,7 +393,9 @@ export function categoriaAutomatica(nome: unknown) {
 }
 
 function categoriaDoItem(item: ItemImportacao) {
-  return item.categoria_id === 'auto' ? categoriaAutomatica(item.nome) : item.categoria_id
+  if (item.categoria_id !== 'auto') return item.categoria_id
+  const doArquivo = texto(item.categoria)
+  return doArquivo ? obterOuCriarCategoria(doArquivo) : categoriaAutomatica(item.nome)
 }
 
 /**
