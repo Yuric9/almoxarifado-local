@@ -1,7 +1,7 @@
 'use client'
 import { useMemo, useRef, useState } from 'react'
 import { FileText, TriangleAlert, Upload } from 'lucide-react'
-import { api } from '@/lib/cliente'
+import { api, formatarQtd } from '@/lib/cliente'
 import type { CategoriaResumo, DocumentoLido, Produto } from '@/lib/tipos'
 import { AvisoErro, Badge, Botao, Campo, Modal, classeInput, useEnvio } from './ui'
 
@@ -15,6 +15,16 @@ type Linha = {
   produto_id: string
   motivo: 'codigo' | 'nome' | 'semelhante' | null
 }
+
+type Modo = 'entrada' | 'atualizar' | 'cadastro'
+
+const MODOS: Array<{ valor: Modo; rotulo: string; ajuda: string; botao: string }> = [
+  { valor: 'entrada', rotulo: 'Somar ao estoque', ajuda: 'As quantidades do arquivo chegaram e são somadas ao estoque.', botao: 'Confirmar entrada' },
+  { valor: 'atualizar', rotulo: 'Atualizar o estoque', ajuda: 'O arquivo tem quanto existe hoje. A diferença é lançada como entrada (se tiver mais) ou saída (se tiver menos).', botao: 'Atualizar estoque' },
+  { valor: 'cadastro', rotulo: 'Apenas cadastrar', ajuda: 'Só cria os materiais novos; o estoque não muda.', botao: 'Cadastrar materiais' }
+]
+
+const numeroDe = (texto: string) => Number(texto.replace(',', '.'))
 
 const MOTIVO: Record<string, string> = { codigo: 'pelo código', nome: 'pelo nome', semelhante: 'nome parecido' }
 
@@ -33,7 +43,7 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
   const [nomeArquivo, setNomeArquivo] = useState('')
   const [doc, setDoc] = useState<DocumentoLido | null>(null)
   const [linhas, setLinhas] = useState<Linha[]>([])
-  const [modo, setModo] = useState<'entrada' | 'cadastro'>('entrada')
+  const [modo, setModo] = useState<Modo>('entrada')
   const [observacao, setObservacao] = useState('')
   const [responsavel, setResponsavel] = useState('')
   const [categoriaNovos, setCategoriaNovos] = useState('auto')
@@ -63,6 +73,21 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
     })
   }
 
+  const quantidadeInvalida = (l: Linha) => modo === 'entrada' ? !(numeroDe(l.quantidade) > 0) : modo === 'atualizar' ? l.quantidade.trim() === '' || !(numeroDe(l.quantidade) >= 0) : false
+  const modoAtual = MODOS.find(m => m.valor === modo)!
+
+  /** No modo "atualizar", soma as linhas do mesmo material (ex.: o item aparece em dois locais). */
+  const contagem = useMemo(() => {
+    const mapa = new Map<string, { total: number; linhas: number }>()
+    for (const l of linhas) {
+      if (!l.incluir || !l.produto_id || quantidadeInvalida(l)) continue
+      const atual = mapa.get(l.produto_id) ?? { total: 0, linhas: 0 }
+      mapa.set(l.produto_id, { total: atual.total + numeroDe(l.quantidade), linhas: atual.linhas + 1 })
+    }
+    return mapa
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linhas, modo])
+
   const atualizar = (i: number, dados: Partial<Linha>) => setLinhas(ls => ls.map((l, j) => (j === i ? { ...l, ...dados } : l)))
   const selecionadas = linhas.filter(l => l.incluir)
   const novos = selecionadas.filter(l => !l.produto_id).length
@@ -78,8 +103,13 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
         categoria_id: categoriaNovos === 'auto' ? 'auto' : categoriaNovos ? Number(categoriaNovos) : null,
         quantidade: l.quantidade === '' ? null : Number(l.quantidade.replace(',', '.'))
       }))
-      const r = await api<{ criados: number; entradas: number }>('/api/documentos/aplicar', { method: 'POST', json: { modo, itens, observacao, responsavel } })
-      const partes = [r.criados && `${r.criados} material(is) cadastrado(s)`, r.entradas && `${r.entradas} entrada(s) registrada(s)`].filter(Boolean)
+      const r = await api<{ criados: number; entradas: number; ajustados: number; iguais: number }>('/api/documentos/aplicar', { method: 'POST', json: { modo, itens, observacao, responsavel } })
+      const partes = [
+        r.criados && `${r.criados} material(is) cadastrado(s)`,
+        r.entradas && `${r.entradas} entrada(s) registrada(s)`,
+        r.ajustados && `${r.ajustados} estoque(s) atualizado(s)`,
+        r.iguais && `${r.iguais} sem diferença`
+      ].filter(Boolean)
       await aoConcluir(`Documento importado: ${partes.join(', ') || 'nada alterado'}`)
     })
   }
@@ -158,7 +188,7 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
                       </td>
                       <td className="px-2 py-1.5 align-top">
                         <input aria-label={`Quantidade do item ${i + 1}`} inputMode="decimal" value={l.quantidade} onChange={e => atualizar(i, { quantidade: e.target.value })}
-                          className={`${classeInput} h-8 text-right ${l.incluir && modo === 'entrada' && !(Number(l.quantidade.replace(',', '.')) > 0) ? 'border-red-400' : ''}`} />
+                          className={`${classeInput} h-8 text-right ${l.incluir && quantidadeInvalida(l) ? 'border-red-400' : ''}`} />
                       </td>
                       <td className="px-2 py-1.5 align-top">
                         <input aria-label={`Unidade do item ${i + 1}`} value={l.unidade} onChange={e => atualizar(i, { unidade: e.target.value.toUpperCase() })} className={`${classeInput} h-8`} />
@@ -169,9 +199,22 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
                           {produtos.map(p => <option key={p.id} value={p.id}>{p.codigo ? `${p.codigo} · ` : ''}{p.nome} ({p.unidade})</option>)}
                         </select>
                         <p className="mt-0.5 text-xs">
-                          {!l.produto_id && <span className="text-blue-700">Será cadastrado como “{l.descricao}”</span>}
+                          {!l.produto_id && <span className="text-blue-700">Será cadastrado como “{l.descricao}”{modo === 'atualizar' && l.quantidade ? ` com ${l.quantidade} ${l.unidade}` : ''}</span>}
                           {l.produto_id && l.motivo && <span className="text-emerald-700">Encontrado {MOTIVO[l.motivo]}</span>}
                           {unidadeDiferente && <span className="ml-1 text-amber-700">· Atenção: o material usa {material.unidade}, o documento {l.unidade}. Ajuste a quantidade.</span>}
+                          {modo === 'atualizar' && material && l.incluir && contagem.has(l.produto_id) && (() => {
+                            const { total, linhas: n } = contagem.get(l.produto_id)!
+                            const diferenca = Math.round((total - material.quantidade_atual) * 1000) / 1000
+                            return (
+                              <span className="block text-slate-600">
+                                Hoje {formatarQtd(material.quantidade_atual)} → fica <b>{formatarQtd(total)}</b> {material.unidade}{' '}
+                                {diferenca === 0 ? <span className="text-slate-400">(sem diferença)</span>
+                                  : diferenca > 0 ? <span className="font-medium text-emerald-700">(entrada de {formatarQtd(diferenca)})</span>
+                                  : <span className="font-medium text-red-700">(saída de {formatarQtd(-diferenca)})</span>}
+                                {n > 1 && <span className="text-slate-400"> · soma de {n} linhas</span>}
+                              </span>
+                            )
+                          })()}
                         </p>
                       </td>
                     </tr>
@@ -185,7 +228,7 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
             <Campo rotulo="Observação nas movimentações">
               <input value={observacao} onChange={e => setObservacao(e.target.value)} className={classeInput} />
             </Campo>
-            <Campo rotulo="Recebido por" opcional>
+            <Campo rotulo={modo === 'entrada' ? 'Recebido por' : 'Responsável'} opcional>
               <input value={responsavel} onChange={e => setResponsavel(e.target.value)} className={classeInput} />
             </Campo>
             <Campo rotulo="Categoria dos novos">
@@ -201,13 +244,17 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
 
           <div className="-mx-5 -mb-4 flex flex-wrap items-center gap-4 border-t border-slate-200 bg-slate-50 px-5 py-3">
             <div className="flex flex-wrap gap-4 text-sm text-slate-700" role="radiogroup" aria-label="O que fazer">
-              <label className="inline-flex items-center gap-2"><input type="radio" name="modo" checked={modo === 'entrada'} onChange={() => setModo('entrada')} /> Dar entrada no estoque</label>
-              <label className="inline-flex items-center gap-2"><input type="radio" name="modo" checked={modo === 'cadastro'} onChange={() => setModo('cadastro')} /> Apenas cadastrar materiais</label>
+              {MODOS.map(m => (
+                <label key={m.valor} className="inline-flex items-center gap-2" title={m.ajuda}>
+                  <input type="radio" name="modo" checked={modo === m.valor} onChange={() => setModo(m.valor)} /> {m.rotulo}
+                </label>
+              ))}
+              <p className="w-full text-xs text-slate-500">{modoAtual.ajuda}</p>
             </div>
             <span className="ml-auto text-xs text-slate-500">{selecionadas.length} selecionado(s){novos ? ` · ${novos} novo(s)` : ''}</span>
             <Botao onClick={() => { setDoc(null); setLinhas([]) }}>Voltar</Botao>
             <Botao variante="primario" onClick={confirmar} disabled={gravacao.enviando || !selecionadas.length}>
-              {gravacao.enviando ? 'Gravando…' : modo === 'entrada' ? 'Confirmar entrada' : 'Cadastrar materiais'}
+              {gravacao.enviando ? 'Gravando…' : modoAtual.botao}
             </Botao>
           </div>
         </div>
