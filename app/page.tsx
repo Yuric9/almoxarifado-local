@@ -197,7 +197,7 @@ export default function Home() {
         </aside>
 
         <main className="min-w-0 flex-1 overflow-auto">
-          <div className="mx-auto max-w-7xl p-6">
+          <div className="mx-auto max-w-[1680px] px-6 py-5">
             {erroCarga && (
               <div role="alert" className="mb-5 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
                 <CircleAlert size={16} /> Não foi possível carregar os dados: {erroCarga}

@@ -1,9 +1,9 @@
 'use client'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ArrowDownToLine, ArrowUpFromLine, ChevronRight, FileSpreadsheet, FileText, FileUp, PackageMinus, Plus, Search, Tags } from 'lucide-react'
-import { api, ehHoje, formatarData, formatarQtd, mensagemErro } from '@/lib/cliente'
+import { ArrowDownToLine, ArrowUpFromLine, ChevronRight, Ellipsis, FileSpreadsheet, FileText, FileUp, PackageMinus, Plus, Search, Tags } from 'lucide-react'
+import { api, ehHoje, formatarDataCurta, formatarQtd, mensagemErro } from '@/lib/cliente'
 import { descreverOrigem, type CategoriaResumo, type Movimentacao, type Produto, type RequisicaoResumo, type ReservaResumo } from '@/lib/tipos'
-import { Badge, Botao, CabecalhoPagina, Painel, Tabela, celula, celulaNumero, classeCampo } from './ui'
+import { Badge, Botao, CabecalhoPagina, MenuAcoes, Painel, Tabela, celula, celulaNumero, classeCampo } from './ui'
 
 const linhaClicavel = 'cursor-pointer hover:bg-slate-50'
 
@@ -11,7 +11,8 @@ function situacao(p: Produto) {
   if (!p.ativo) return <Badge>Inativo</Badge>
   if (p.quantidade_atual <= 0) return <Badge tom="vermelho">Sem estoque</Badge>
   if (p.quantidade_atual <= p.estoque_minimo) return <Badge tom="amarelo">Abaixo do mínimo</Badge>
-  return <Badge tom="verde">Normal</Badge>
+  // Situação normal não precisa de destaque: o selo só aparece quando há algo a fazer.
+  return null
 }
 
 export function StatusReserva({ status }: { status: string }) {
@@ -21,9 +22,15 @@ export function StatusReserva({ status }: { status: string }) {
   return <Badge>Cancelado</Badge>
 }
 
+const COR_MOVIMENTO = { vermelho: 'bg-red-500', azul: 'bg-blue-500', verde: 'bg-emerald-500', neutro: 'bg-slate-400' }
+
 function TipoMovimento({ m }: { m: Movimentacao }) {
   const tom = m.origem === 'BAIXA' ? 'vermelho' : m.origem === 'AJUSTE' || m.origem === 'ESTORNO' ? 'azul' : m.tipo === 'ENTRADA' ? 'verde' : 'neutro'
-  return <Badge tom={tom}>{descreverOrigem(m)}</Badge>
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-slate-700">
+      <span className={`h-2 w-2 shrink-0 rounded-full ${COR_MOVIMENTO[tom]}`} />{descreverOrigem(m)}
+    </span>
+  )
 }
 
 /* ------------------------------------------------------------------ painel */
@@ -75,7 +82,7 @@ export function TelaPainel({ produtos, movs, reservas, acoes, navegar, abrirMate
       <div className="grid gap-5 xl:grid-cols-2">
         <Painel titulo="Reposição necessária" acoes={<Botao variante="fantasma" onClick={() => navegar({ tela: 'materiais', alerta: true })}>Ver todos</Botao>} semPadding>
           <Tabela colunas={[{ titulo: 'Material' }, { titulo: 'Estoque', alinhar: 'direita' }, { titulo: 'Mínimo', alinhar: 'direita' }]} vazio="Nenhum material abaixo do mínimo.">
-            {alerta.slice(0, 8).map(p => (
+            {alerta.slice(0, 10).map(p => (
               <tr key={p.id} onClick={() => abrirMaterial(p.id)} className={linhaClicavel}>
                 <td className={celula}>{p.nome}</td>
                 <td className={`${celulaNumero} font-medium text-amber-700`}>{formatarQtd(p.quantidade_atual)} {p.unidade}</td>
@@ -87,9 +94,9 @@ export function TelaPainel({ produtos, movs, reservas, acoes, navegar, abrirMate
 
         <Painel titulo="Últimas movimentações" acoes={<Botao variante="fantasma" onClick={() => navegar({ tela: 'movimentacoes' })}>Ver todas</Botao>} semPadding>
           <Tabela colunas={[{ titulo: 'Data' }, { titulo: 'Material' }, { titulo: 'Qtd.', alinhar: 'direita' }]} vazio="Nenhuma movimentação registrada.">
-            {movs.slice(0, 8).map(m => (
+            {movs.slice(0, 10).map(m => (
               <tr key={m.id} onClick={() => (m.requisicao_id ? abrirComprovante(m.requisicao_id) : abrirMaterial(m.produto_id))} className={linhaClicavel}>
-                <td className={`${celula} whitespace-nowrap text-slate-500`}>{formatarData(m.criado_em)}</td>
+                <td className={`${celula} whitespace-nowrap text-slate-500`}>{formatarDataCurta(m.criado_em)}</td>
                 <td className={celula}>
                   <span className="inline-flex items-center gap-2">
                     {m.tipo === 'ENTRADA'
@@ -139,15 +146,20 @@ export function TelaMateriais({ produtos, categorias, carregando, filtroAlerta, 
     )
   }, [produtos, busca, categoria, soAlerta, inativos])
 
+  // Coluna "Local" só aparece se alguém usa localização.
+  const temLocal = produtos.some(p => p.localizacao)
+
   return (
     <>
       <CabecalhoPagina
         titulo="Materiais"
         descricao="Clique em um material para ver a ficha, editar, dar baixa ou ajustar o estoque"
         acoes={<>
-          <Botao onClick={aoClassificar} icone={<Tags size={16} />}>Classificar</Botao>
-          <Botao onClick={aoImportarDocumento} icone={<FileUp size={16} />}>Importar documento</Botao>
-          <Botao onClick={aoPlanilhas} icone={<FileSpreadsheet size={16} />}>Planilhas</Botao>
+          <MenuAcoes rotulo="Mais opções" icone={<Ellipsis size={16} />} itens={[
+            { rotulo: 'Importar documento', descricao: 'Nota fiscal (XML ou PDF), pedido ou lista', icone: <FileUp size={16} />, aoClicar: aoImportarDocumento },
+            { rotulo: 'Planilhas', descricao: 'Importar ou exportar materiais em Excel', icone: <FileSpreadsheet size={16} />, aoClicar: aoPlanilhas },
+            { rotulo: 'Classificar materiais', descricao: 'Sugerir categorias pela tabela AGETOP', icone: <Tags size={16} />, aoClicar: aoClassificar }
+          ]} />
           <Botao onClick={aoBaixa} icone={<PackageMinus size={16} />}>Dar baixa</Botao>
           <Botao onClick={aoEntrada} icone={<ArrowDownToLine size={16} />}>Registrar entrada</Botao>
           <Botao variante="primario" onClick={aoNovo} icone={<Plus size={16} />}>Novo material</Botao>
@@ -175,22 +187,24 @@ export function TelaMateriais({ produtos, categorias, carregando, filtroAlerta, 
         </div>
         <Tabela
           colunas={[
-            { titulo: 'Código' }, { titulo: 'Material' }, { titulo: 'Categoria' }, { titulo: 'Local' }, { titulo: 'Físico', alinhar: 'direita' },
-            { titulo: 'Reservado', alinhar: 'direita' }, { titulo: 'Disponível', alinhar: 'direita' }, { titulo: 'Mínimo', alinhar: 'direita' }, { titulo: 'Un.' }, { titulo: 'Situação' }
+            { titulo: 'Material' }, { titulo: 'Categoria', largura: 'w-44' }, ...(temLocal ? [{ titulo: 'Local', largura: 'w-40' }] : []),
+            { titulo: 'Estoque', alinhar: 'direita', largura: 'w-40' }, { titulo: 'Mínimo', alinhar: 'direita', largura: 'w-24' }, { titulo: 'Situação', largura: 'w-40' }
           ]}
           vazio={carregando ? 'Carregando…' : produtos.length === 0 ? 'Nenhum material cadastrado. Use "Novo material" ou importe uma planilha.' : 'Nenhum material encontrado com esses filtros.'}
         >
           {filtrados.map(p => (
             <tr key={p.id} onClick={() => abrirMaterial(p.id)} className={`${linhaClicavel} ${p.ativo ? '' : 'opacity-60'}`}>
-              <td className={`${celula} whitespace-nowrap font-mono text-xs text-slate-500`}>{p.codigo || '—'}</td>
-              <td className={`${celula} font-medium text-slate-900`}>{p.nome}</td>
-              <td className={`${celula} text-slate-600`}>{p.categoria || '—'}</td>
-              <td className={`${celula} text-slate-600`}>{p.localizacao || '—'}</td>
-              <td className={celulaNumero}>{formatarQtd(p.quantidade_atual)}</td>
-              <td className={`${celulaNumero} text-slate-500`}>{p.quantidade_reservada ? formatarQtd(p.quantidade_reservada) : '—'}</td>
-              <td className={`${celulaNumero} font-medium`}>{formatarQtd(p.quantidade_disponivel)}</td>
+              <td className={celula}>
+                <span className="font-medium text-slate-900">{p.nome}</span>
+                {p.codigo && <span className="ml-2 font-mono text-xs text-slate-400">{p.codigo}</span>}
+              </td>
+              <td className={`${celula} text-slate-600`}>{p.categoria || <span className="text-slate-400">—</span>}</td>
+              {temLocal && <td className={`${celula} text-slate-600`}>{p.localizacao || <span className="text-slate-400">—</span>}</td>}
+              <td className={celulaNumero}>
+                <span className="font-medium text-slate-900">{formatarQtd(p.quantidade_atual)}</span> <span className="text-xs text-slate-500">{p.unidade}</span>
+                {p.quantidade_reservada > 0 && <span className="block text-xs text-amber-700">{formatarQtd(p.quantidade_reservada)} reservado · {formatarQtd(p.quantidade_disponivel)} livre</span>}
+              </td>
               <td className={`${celulaNumero} text-slate-500`}>{formatarQtd(p.estoque_minimo)}</td>
-              <td className={`${celula} text-slate-500`}>{p.unidade}</td>
               <td className={celula}>{situacao(p)}</td>
             </tr>
           ))}
@@ -232,12 +246,12 @@ export function TelaRetiradas({ requisicoes, aoNova, aoComprovante }: {
           {lista.map(r => (
             <tr key={r.id} onClick={() => aoComprovante(r.id)} className={`${linhaClicavel} ${r.status === 'CANCELADA' ? 'opacity-60' : ''}`}>
               <td className={`${celula} whitespace-nowrap font-mono text-xs`}>{r.numero}</td>
-              <td className={`${celula} whitespace-nowrap text-slate-600`}>{formatarData(r.criado_em)}</td>
+              <td className={`${celula} whitespace-nowrap text-slate-600`}>{formatarDataCurta(r.criado_em)}</td>
               <td className={`${celula} font-medium`}>{r.retirado_por}</td>
               <td className={`${celula} text-slate-600`}>{r.setor || '—'}</td>
               <td className={`${celula} text-slate-600`}>{r.finalidade || '—'}{r.reserva_numero && <span className="ml-2"><Badge tom="azul">{r.reserva_numero}</Badge></span>}</td>
               <td className={celulaNumero}>{r.total_itens}</td>
-              <td className={celula}>{r.status === 'CANCELADA' ? <Badge tom="vermelho">Estornada</Badge> : <Badge tom="verde">Finalizada</Badge>}</td>
+              <td className={celula}>{r.status === 'CANCELADA' ? <Badge tom="vermelho">Estornada</Badge> : <span className="text-slate-500">Finalizada</span>}</td>
               <td className={`${celula} text-slate-400`}><FileText size={16} /></td>
             </tr>
           ))}
@@ -278,7 +292,7 @@ export function TelaReservas({ reservas, aoNova, abrirReserva }: {
           {lista.map(r => (
             <tr key={r.id} onClick={() => abrirReserva(r.id)} className={linhaClicavel}>
               <td className={`${celula} whitespace-nowrap font-mono text-xs`}>{r.numero}</td>
-              <td className={`${celula} whitespace-nowrap text-slate-600`}>{formatarData(r.criado_em)}</td>
+              <td className={`${celula} whitespace-nowrap text-slate-600`}>{formatarDataCurta(r.criado_em)}</td>
               <td className={`${celula} font-medium`}>{r.finalidade}</td>
               <td className={`${celula} text-slate-600`}>{r.reservado_por || '—'}</td>
               <td className={celulaNumero}>{r.total_itens}</td>
@@ -349,12 +363,12 @@ export function TelaMovimentacoes({ filtroHoje, versao, abrirMaterial, abrirComp
         >
           {lista.map(m => (
             <tr key={m.id} onClick={() => (m.requisicao_id ? abrirComprovante(m.requisicao_id) : abrirMaterial(m.produto_id))} className={linhaClicavel}>
-              <td className={`${celula} whitespace-nowrap text-slate-600`}>{formatarData(m.criado_em)}</td>
+              <td className={`${celula} whitespace-nowrap text-slate-600`}>{formatarDataCurta(m.criado_em)}</td>
               <td className={celula}><TipoMovimento m={m} /></td>
               <td className={`${celula} font-medium`}>{m.produto_nome}</td>
               <td className={`${celulaNumero} whitespace-nowrap`}>{m.tipo === 'SAIDA' ? '−' : '+'}{formatarQtd(m.quantidade)} {m.unidade}</td>
               <td className={`${celula} text-slate-600`}>{m.responsavel || '—'}</td>
-              <td className={`${celula} max-w-xs truncate text-slate-500`} title={m.observacao || ''}>{m.observacao || '—'}</td>
+              <td className={`${celula} max-w-xs truncate text-slate-500`} title={m.observacao || ''}>{m.observacao && m.observacao !== descreverOrigem(m) ? m.observacao : <span className="text-slate-400">—</span>}</td>
             </tr>
           ))}
         </Tabela>

@@ -1,7 +1,7 @@
 'use client'
-import { useEffect, useId, useState, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { mensagemErro } from '@/lib/cliente'
-import { X } from 'lucide-react'
+import { ChevronDown, X } from 'lucide-react'
 
 /* ------------------------------------------------------------------ botões */
 
@@ -198,8 +198,50 @@ export function Tabela({ colunas, vazio, children }: {
   )
 }
 
-export const celula = 'px-4 py-2.5 align-middle'
-export const celulaNumero = 'px-4 py-2.5 text-right tabular-nums align-middle'
+export const celula = 'px-4 py-2 align-middle'
+export const celulaNumero = 'px-4 py-2 text-right tabular-nums align-middle'
+
+/* ------------------------------------------------------------------ menu de ações */
+
+export type ItemMenuAcoes = { rotulo: string; descricao?: string; icone?: ReactNode; aoClicar: () => void }
+
+/** Botão que abre uma lista de ações secundárias (agrupa botões que poluiriam o cabeçalho). */
+export function MenuAcoes({ rotulo, icone, itens }: { rotulo: string; icone?: ReactNode; itens: ItemMenuAcoes[] }) {
+  const [aberto, setAberto] = useState(false)
+  const raiz = useRef<HTMLDivElement>(null)
+  const id = useId()
+
+  useEffect(() => {
+    if (!aberto) return
+    const fora = (e: MouseEvent) => { if (!raiz.current?.contains(e.target as Node)) setAberto(false) }
+    const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') setAberto(false) }
+    document.addEventListener('mousedown', fora)
+    document.addEventListener('keydown', tecla)
+    return () => { document.removeEventListener('mousedown', fora); document.removeEventListener('keydown', tecla) }
+  }, [aberto])
+
+  return (
+    <div ref={raiz} className="relative">
+      <Botao icone={icone} aria-haspopup="menu" aria-expanded={aberto} aria-controls={id} onClick={() => setAberto(a => !a)}>
+        {rotulo}<ChevronDown size={14} className="-mr-1 text-slate-400" />
+      </Botao>
+      {aberto && (
+        <div id={id} role="menu" className="absolute right-0 z-30 mt-1 w-72 rounded-lg border border-slate-200 bg-superficie p-1 shadow-lg">
+          {itens.map(item => (
+            <button key={item.rotulo} type="button" role="menuitem" onClick={() => { setAberto(false); item.aoClicar() }}
+              className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-slate-100">
+              {item.icone && <span className="mt-0.5 text-slate-500">{item.icone}</span>}
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-slate-900">{item.rotulo}</span>
+                {item.descricao && <span className="block text-xs text-slate-500">{item.descricao}</span>}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function CabecalhoPagina({ titulo, descricao, acoes }: { titulo: string; descricao?: string; acoes?: ReactNode }) {
   return (
