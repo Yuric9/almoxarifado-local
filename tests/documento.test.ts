@@ -126,7 +126,7 @@ describe('aplicar importação', () => {
         { nome: 'Areia média lavada', codigo: 'AR-MED', unidade: 'M³', quantidade: 6.5 }
       ]
     })
-    expect(r).toEqual({ criados: 1, entradas: 2 })
+    expect(r).toEqual({ criados: 1, entradas: 2, ajustados: 0, iguais: 0 })
     const produtos = repo.listarProdutos()
     expect(produtos.find(p => p.id === cimento)?.quantidade_atual).toBe(50)
     expect(produtos.find(p => p.nome === 'Areia média lavada')).toMatchObject({ codigo: 'AR-MED', unidade: 'M³', quantidade_atual: 6.5 })
@@ -136,7 +136,7 @@ describe('aplicar importação', () => {
 
   it('modo cadastro cria os materiais sem mexer no estoque', () => {
     const r = repo.aplicarImportacao({ modo: 'cadastro', itens: [{ nome: 'Prego 17x27', unidade: 'KG', quantidade: 5 }] })
-    expect(r).toEqual({ criados: 1, entradas: 0 })
+    expect(r).toEqual({ criados: 1, entradas: 0, ajustados: 0, iguais: 0 })
     expect(repo.listarProdutos()[0].quantidade_atual).toBe(0)
   })
 
@@ -149,5 +149,40 @@ describe('aplicar importação', () => {
     expect(repo.listarProdutos().map(p => p.nome)).toEqual(['Tijolo'])
     expect(() => repo.aplicarImportacao({ modo: 'entrada', itens: [{ nome: 'Telha', quantidade: 0 }] })).toThrow('maior que zero')
     expect(() => repo.aplicarImportacao({ modo: 'x', itens: [{ nome: 'Telha' }] })).toThrow('Escolha')
+  })
+
+  it('modo atualizar: o arquivo tem o estoque de hoje e a diferença vira entrada ou saída', () => {
+    const cimento = repo.criarProduto({ nome: 'Cimento', unidade: 'SC', quantidade: 10 })
+    const areia = repo.criarProduto({ nome: 'Areia', unidade: 'M³', quantidade: 8 })
+    const prego = repo.criarProduto({ nome: 'Prego', unidade: 'KG', quantidade: 3 })
+    const r = repo.aplicarImportacao({
+      modo: 'atualizar',
+      observacao: 'Contagem de outubro',
+      responsavel: 'Carlos',
+      itens: [
+        { produto_id: cimento, quantidade: 25 },
+        { produto_id: areia, quantidade: 2 },
+        { produto_id: areia, quantidade: 1 },
+        { produto_id: prego, quantidade: 3 },
+        { nome: 'Tijolo', unidade: 'UN', quantidade: 500 }
+      ]
+    })
+    expect(r).toEqual({ criados: 1, entradas: 0, ajustados: 2, iguais: 1 })
+    const estoque = Object.fromEntries(repo.listarProdutos().map(p => [p.nome, p.quantidade_atual]))
+    expect(estoque).toEqual({ Areia: 3, Cimento: 25, Prego: 3, Tijolo: 500 })
+    const movs = repo.listarMovimentacoes().filter(m => m.origem === 'AJUSTE')
+    expect(movs.map(m => [m.produto_nome, m.tipo, m.quantidade]).sort()).toEqual([['Areia', 'SAIDA', 5], ['Cimento', 'ENTRADA', 15]])
+    expect(movs[0]).toMatchObject({ observacao: 'Contagem de outubro', responsavel: 'Carlos' })
+  })
+
+  it('modo atualizar aceita zero, recusa quantidade vazia e não passa por cima de reserva', () => {
+    const cabo = repo.criarProduto({ nome: 'Cabo', quantidade: 10 })
+    repo.aplicarImportacao({ modo: 'atualizar', itens: [{ produto_id: cabo, quantidade: 0 }] })
+    expect(repo.listarProdutos()[0].quantidade_atual).toBe(0)
+    expect(() => repo.aplicarImportacao({ modo: 'atualizar', itens: [{ produto_id: cabo, quantidade: null }] })).toThrow('Item 1: informe a quantidade')
+    const fita = repo.criarProduto({ nome: 'Fita', quantidade: 10 })
+    repo.criarReserva({ finalidade: 'Obra', itens: [{ produto_id: fita, quantidade: 6 }] })
+    expect(() => repo.aplicarImportacao({ modo: 'atualizar', itens: [{ produto_id: fita, nome: 'Fita', quantidade: 2 }] })).toThrow('Item 1 (Fita): Há 6')
+    expect(repo.listarProdutos().find(p => p.id === fita)?.quantidade_atual).toBe(10)
   })
 })

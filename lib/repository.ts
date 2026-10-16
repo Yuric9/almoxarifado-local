@@ -395,40 +395,72 @@ function categoriaDoItem(item: ItemImportacao) {
 }
 
 /**
- * Grava os itens conferidos de um documento importado (nota fiscal, pedido, lista).
- * Cria os materiais novos e, no modo "entrada", soma as quantidades ao estoque.
+ * Grava os itens conferidos de um documento importado (nota fiscal, pedido, lista, planilha).
+ * - "entrada": soma as quantidades ao estoque;
+ * - "atualizar": a quantidade do arquivo é o estoque de hoje; o sistema lança a diferença
+ *   (soma ou subtrai) como ajuste de inventário;
+ * - "cadastro": só cria os materiais novos.
+ * Materiais novos são criados (no modo "atualizar", já com a quantidade do arquivo).
  * Tudo em uma transação: se um item falhar, nada é gravado.
  */
 export function aplicarImportacao(input: { modo: unknown; itens: unknown; observacao?: unknown; responsavel?: unknown }) {
-  const modo = input.modo === 'cadastro' ? 'cadastro' : input.modo === 'entrada' ? 'entrada' : null
-  if (!modo) throw new Error('Escolha entre dar entrada no estoque ou apenas cadastrar')
+  const modo = input.modo === 'cadastro' || input.modo === 'entrada' || input.modo === 'atualizar' ? input.modo : null
+  if (!modo) throw new Error('Escolha entre somar ao estoque, atualizar o estoque ou apenas cadastrar')
   if (!Array.isArray(input.itens) || !input.itens.length) throw new Error('Nenhum item selecionado')
   const itens = input.itens as ItemImportacao[]
   const db = getDb()
   return db.transaction(() => {
-    const resultado = { criados: 0, entradas: 0 }
+    const resultado = { criados: 0, entradas: 0, ajustados: 0, iguais: 0 }
+    // No modo "atualizar", o mesmo material em duas linhas (ex.: dois locais) tem as quantidades somadas.
+    const contagens = new Map<number, { quantidade: number; rotulo: string }>()
+
     itens.forEach((item, i) => {
       const rotulo = `Item ${i + 1}${texto(item.nome) ? ` (${texto(item.nome)})` : ''}`
       try {
         let produtoId = item.produto_id ? Number(item.produto_id) : null
+        const quantidadeArquivo = modo === 'atualizar' ? quantidadeContada(item.quantidade) : 0
         if (produtoId) {
           const p = db.prepare('SELECT ativo FROM produtos WHERE id=?').get(produtoId) as { ativo: number } | undefined
           if (!p) throw new Error('material não encontrado')
           if (!p.ativo) throw new Error('o material está inativo')
         } else {
-          produtoId = criarProduto({ nome: item.nome, codigo: item.codigo, unidade: item.unidade, categoria_id: categoriaDoItem(item), quantidade: 0 })
+          produtoId = criarProduto({
+            nome: item.nome, codigo: item.codigo, unidade: item.unidade, categoria_id: categoriaDoItem(item),
+            quantidade: modo === 'atualizar' ? quantidadeArquivo : 0
+          })
           resultado.criados++
+          if (modo === 'atualizar') return // já nasce com a quantidade do arquivo
         }
         if (modo === 'entrada') {
           registrarEntrada({ produto_id: produtoId, quantidade: item.quantidade, responsavel: input.responsavel, observacao: input.observacao }, 'IMPORTACAO')
           resultado.entradas++
+        } else if (modo === 'atualizar') {
+          const anterior = contagens.get(produtoId)
+          contagens.set(produtoId, { quantidade: (anterior?.quantidade ?? 0) + quantidadeArquivo, rotulo: anterior?.rotulo ?? rotulo })
         }
       } catch (e) {
         throw new Error(`${rotulo}: ${e instanceof Error ? e.message : 'erro'}`)
       }
     })
+
+    for (const [produtoId, { quantidade, rotulo }] of Array.from(contagens.entries())) {
+      const atual = (db.prepare('SELECT quantidade_atual FROM produtos WHERE id=?').get(produtoId) as { quantidade_atual: number }).quantidade_atual
+      if (Math.round((quantidade - atual) * 1000) === 0) { resultado.iguais++; continue }
+      try {
+        ajustarEstoque({ produto_id: produtoId, quantidade_contada: quantidade, responsavel: input.responsavel, observacao: texto(input.observacao) ?? 'Atualização por arquivo' })
+        resultado.ajustados++
+      } catch (e) {
+        throw new Error(`${rotulo}: ${e instanceof Error ? e.message : 'erro'}`)
+      }
+    }
     return resultado
   })()
+}
+
+function quantidadeContada(valor: unknown) {
+  const n = Number(valor)
+  if (vazio(valor) || !Number.isFinite(n) || n < 0) throw new Error('informe a quantidade em estoque (0 ou mais)')
+  return n
 }
 
 /** Baixa por perda, roubo, vencimento ou quebra. Não consome material reservado. */
