@@ -7,6 +7,11 @@ import { Badge, Botao, CabecalhoPagina, MenuAcoes, Painel, Tabela, celula, celul
 
 const linhaClicavel = 'cursor-pointer hover:bg-slate-50'
 
+/** Quantidade em destaque: vermelho zerado, laranja abaixo do mínimo. */
+export function corQuantidade(quantidade: number, minimo: number) {
+  return quantidade <= 0 ? 'text-red-700' : quantidade <= minimo ? 'text-amber-700' : 'text-slate-900'
+}
+
 function situacao(p: Produto) {
   if (!p.ativo) return <Badge>Inativo</Badge>
   if (p.quantidade_atual <= 0) return <Badge tom="vermelho">Sem estoque</Badge>
@@ -196,7 +201,7 @@ export function TelaMateriais({ produtos, categorias, carregando, filtroAlerta, 
                 {p.codigo && <span className="ml-2 font-mono text-xs text-slate-400">{p.codigo}</span>}
               </td>
               <td className={celulaNumero}>
-                <span className="font-medium text-slate-900">{formatarQtd(p.quantidade_atual)}</span>
+                <span className={`text-lg font-bold leading-none ${corQuantidade(p.quantidade_atual, p.estoque_minimo)}`}>{formatarQtd(p.quantidade_atual)}</span>
                 {p.quantidade_reservada > 0 && <span className="block text-xs text-amber-700">{formatarQtd(p.quantidade_reservada)} reservado</span>}
               </td>
               <td className={`${celula} whitespace-nowrap text-slate-600`}>{p.unidade}</td>

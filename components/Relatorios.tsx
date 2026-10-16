@@ -4,6 +4,7 @@ import { Download, FileSpreadsheet, Printer } from 'lucide-react'
 import { api, formatarData, formatarQtd, lerData, mensagemErro } from '@/lib/cliente'
 import { descreverOrigem, type Relatorio } from '@/lib/tipos'
 import type { CategoriaResumo, LinhaEstoque, Produto } from '@/lib/tipos'
+import { corQuantidade } from './Telas'
 import { Badge, Botao, CabecalhoPagina, Painel, Tabela, celula, celulaNumero, classeCampo } from './ui'
 
 type Modo = 'mes' | 'dia' | 'periodo'
@@ -340,7 +341,7 @@ function RelatorioEstoque({ empresa, produtos, categorias }: { empresa?: string;
                         <span className="font-medium text-slate-900">{l.nome}</span>
                         {l.codigo && <span className="ml-2 font-mono text-xs text-slate-400">{l.codigo}</span>}
                       </td>
-                      <td className={`${celulaNumero} font-medium`}>{formatarQtd(l.quantidade)}{l.reservada > 0 && <span className="block text-xs font-normal text-amber-700">{formatarQtd(l.reservada)} reservado</span>}</td>
+                      <td className={celulaNumero}><span className={`text-lg font-bold leading-none ${corQuantidade(l.quantidade, l.minimo)}`}>{formatarQtd(l.quantidade)}</span>{l.reservada > 0 && <span className="block text-xs font-normal text-amber-700">{formatarQtd(l.reservada)} reservado</span>}</td>
                       <td className={`${celula} text-slate-600`}>{l.unidade}</td>
                       <td className={`${celulaNumero} text-slate-500`}>{formatarQtd(l.minimo)}</td>
                       {!agrupar && <td className={`${celula} text-slate-600`}>{l.categoria || '—'}</td>}
