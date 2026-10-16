@@ -259,6 +259,27 @@ export function separarUnidade(valor: string): { unidade: string; categoria: str
   return { unidade: normalizarUnidade(m[2]) ?? m[2].toUpperCase(), categoria: prefixo }
 }
 
+/**
+ * Corrige materiais gravados com a categoria grudada na unidade ("MATERIAL ELETRICO PAR"):
+ * a unidade fica "PAR" e, se o material estiver sem categoria, recebe a que estava escrita.
+ * Seguro para rodar sempre: depois de corrigido, o material não é mais alterado.
+ */
+export function corrigirUnidadesGrudadas() {
+  const db = getDb()
+  const produtos = db.prepare('SELECT id, unidade, categoria_id FROM produtos').all() as Array<{ id: number; unidade: string; categoria_id: number | null }>
+  const atualizar = db.prepare('UPDATE produtos SET unidade=?, categoria_id=? WHERE id=?')
+  let corrigidos = 0
+  db.transaction(() => {
+    for (const p of produtos) {
+      const { unidade, categoria } = separarUnidade(p.unidade)
+      if (!categoria) continue
+      atualizar.run(unidade, p.categoria_id ?? obterOuCriarCategoria(categoria), p.id)
+      corrigidos++
+    }
+  })()
+  return corrigidos
+}
+
 /* ------------------------------------------------------------------ classificação */
 
 type ProdutoBanco = { id: number; nome: string; unidade: string; categoria_id: number | null; categoria: string | null }

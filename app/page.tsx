@@ -215,7 +215,7 @@ export default function Home() {
             {tela === 'retiradas' && <TelaRetiradas requisicoes={requisicoes} aoNova={() => setJanela('requisicao')} aoComprovante={abrirComprovante} />}
             {tela === 'reservas' && <TelaReservas reservas={reservas} aoNova={() => setJanela('reserva')} abrirReserva={setReservaAberta} />}
             {tela === 'movimentacoes' && <TelaMovimentacoes filtroHoje={filtroHoje} versao={versao} abrirMaterial={setMaterialAberto} abrirComprovante={abrirComprovante} />}
-            {tela === 'relatorios' && <TelaRelatorios empresa={config.empresa_nome} />}
+            {tela === 'relatorios' && <TelaRelatorios empresa={config.empresa_nome} produtos={produtos} categorias={categorias} />}
             {tela === 'backup' && <TelaBackup aoRestaurar={recarregar} notificar={notificar} />}
             {tela === 'configuracoes' && !configCarregada && <p className="py-10 text-center text-sm text-slate-500">Carregando…</p>}
             {tela === 'configuracoes' && configCarregada && (

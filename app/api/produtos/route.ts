@@ -1,11 +1,19 @@
 import { falha, lerJson, ok } from '@/lib/api'
+import { corrigirUnidadesGrudadas } from '@/lib/classificacao'
 import { criarProduto, listarProdutos } from '@/lib/repository'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+let unidadesConferidas = false
+
 export function GET() {
   try {
+    // Uma vez por abertura do sistema: corrige unidades que vieram com a categoria junto.
+    if (!unidadesConferidas) {
+      corrigirUnidadesGrudadas()
+      unidadesConferidas = true
+    }
     return ok(listarProdutos())
   } catch (e) {
     return falha(e, 500)

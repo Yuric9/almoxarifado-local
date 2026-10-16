@@ -265,3 +265,28 @@ describe('atualização da versão anterior', () => {
     expect(estoque(p.id).quantidade_atual).toBe(998990)
   })
 })
+
+describe('relatório de estoque', () => {
+  it('lista abaixo do mínimo, sem estoque, por categoria e selecionados, sem inativos', async () => {
+    const { relatorioEstoque, estoqueXlsx } = await import('@/lib/relatorios')
+    const eletrica = repo.listarCategorias().find(c => c.nome === 'Elétrica')!.id
+    const fita = repo.criarProduto({ nome: 'Fita', quantidade: 2, minimo: 5, categoria_id: eletrica })
+    const cabo = repo.criarProduto({ nome: 'Cabo', quantidade: 0, minimo: 5, categoria_id: eletrica })
+    const areia = repo.criarProduto({ nome: 'Areia', quantidade: 50, minimo: 5 })
+    const velho = repo.criarProduto({ nome: 'Velho', quantidade: 0, minimo: 5 })
+    repo.definirProdutoAtivo(velho, false)
+
+    const nomes = (o: Parameters<typeof relatorioEstoque>[0]) => relatorioEstoque(o).linhas.map(l => l.nome)
+    expect(nomes({ filtro: 'todos' })).toEqual(['Cabo', 'Fita', 'Areia'])
+    expect(nomes({ filtro: 'abaixo' })).toEqual(['Cabo', 'Fita'])
+    expect(nomes({ filtro: 'sem' })).toEqual(['Cabo'])
+    expect(nomes({ filtro: 'todos', categoria: String(eletrica) })).toEqual(['Cabo', 'Fita'])
+    expect(nomes({ filtro: 'todos', categoria: 'sem' })).toEqual(['Areia'])
+    expect(nomes({ filtro: 'selecionados', ids: [areia, fita] })).toEqual(['Fita', 'Areia'])
+    expect(nomes({ filtro: 'selecionados', ids: [] })).toEqual([])
+    expect(relatorioEstoque({ filtro: 'todos' }).linhas.map(l => l.situacao)).toEqual(['Sem estoque', 'Abaixo do mínimo', 'Normal'])
+    expect(cabo).toBeGreaterThan(0)
+    const xlsx = await estoqueXlsx(relatorioEstoque({ filtro: 'todos' }).linhas)
+    expect(xlsx.subarray(0, 2).toString()).toBe('PK')
+  })
+})

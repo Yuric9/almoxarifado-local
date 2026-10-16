@@ -146,3 +146,85 @@ export async function relatorioXlsx(r: Relatorio) {
     { data: movs, sheet: 'Movimentações', columns: [{ width: 20 }, { width: 9 }, { width: 36 }, { width: 12 }, { width: 9 }, { width: 26 }, { width: 20 }, { width: 40 }] }
   ]).toBuffer()
 }
+
+/* ------------------------------------------------------------------ relatório de estoque (listas) */
+
+export type FiltroEstoque = 'todos' | 'abaixo' | 'sem' | 'selecionados'
+
+export const FILTROS_ESTOQUE: Record<FiltroEstoque, string> = {
+  todos: 'Todos os materiais',
+  abaixo: 'Abaixo do mínimo',
+  sem: 'Sem estoque',
+  selecionados: 'Materiais selecionados'
+}
+
+export type LinhaEstoque = {
+  id: number
+  codigo: string | null
+  nome: string
+  categoria: string | null
+  localizacao: string | null
+  quantidade: number
+  reservada: number
+  unidade: string
+  minimo: number
+  situacao: 'Sem estoque' | 'Abaixo do mínimo' | 'Normal'
+}
+
+/**
+ * Lista de materiais ativos para conferência e impressão.
+ * - filtro: todos, abaixo do mínimo (inclui os zerados), sem estoque ou só os selecionados (ids);
+ * - categoria: id da categoria, "sem" (sem categoria) ou vazio (todas).
+ * Ordenado por categoria e nome, para sair agrupado.
+ */
+export function relatorioEstoque(opcoes: { filtro?: string; categoria?: string; ids?: number[] }) {
+  const filtro = (opcoes.filtro && opcoes.filtro in FILTROS_ESTOQUE ? opcoes.filtro : 'todos') as FiltroEstoque
+  const condicoes = ['p.ativo=1']
+  const parametros: Array<string | number> = []
+  if (filtro === 'abaixo') condicoes.push('p.quantidade_atual <= p.estoque_minimo')
+  if (filtro === 'sem') condicoes.push('p.quantidade_atual <= 0')
+  if (filtro === 'selecionados') {
+    const ids = (opcoes.ids ?? []).filter(n => Number.isInteger(n) && n > 0)
+    if (!ids.length) return { filtro, linhas: [] as LinhaEstoque[] }
+    condicoes.push(`p.id IN (${ids.map(() => '?').join(',')})`)
+    parametros.push(...ids)
+  }
+  if (opcoes.categoria === 'sem') condicoes.push('p.categoria_id IS NULL')
+  else if (opcoes.categoria) { condicoes.push('p.categoria_id=?'); parametros.push(Number(opcoes.categoria)) }
+
+  const linhas = getDb().prepare(`
+    SELECT p.id, p.codigo, p.nome, c.nome AS categoria, p.localizacao, p.quantidade_atual AS quantidade,
+      COALESCE((SELECT SUM(ri.quantidade) FROM reserva_itens ri JOIN reservas r ON r.id=ri.reserva_id
+                WHERE ri.produto_id=p.id AND r.status IN ('SEPARADO','AGUARDANDO_RETIRADA')), 0) AS reservada,
+      p.unidade, p.estoque_minimo AS minimo
+    FROM produtos p LEFT JOIN categorias c ON c.id=p.categoria_id
+    WHERE ${condicoes.join(' AND ')}
+    ORDER BY c.nome IS NULL, c.nome COLLATE NOCASE, p.nome COLLATE NOCASE
+  `).all(...parametros) as Array<Omit<LinhaEstoque, 'situacao'>>
+
+  return {
+    filtro,
+    linhas: linhas.map(l => ({
+      ...l,
+      situacao: (l.quantidade <= 0 ? 'Sem estoque' : l.quantidade <= l.minimo ? 'Abaixo do mínimo' : 'Normal') as LinhaEstoque['situacao']
+    }))
+  }
+}
+
+const COLUNAS_ESTOQUE = ['Categoria', 'Código', 'Material', 'Quantidade', 'Unidade', 'Mínimo', 'Situação', 'Localização']
+const valoresEstoque = (l: LinhaEstoque) => [l.categoria || 'Sem categoria', l.codigo || '', l.nome, l.quantidade, l.unidade, l.minimo, l.situacao, l.localizacao || '']
+
+export function estoqueCsvLinhas(linhas: LinhaEstoque[]) {
+  return [COLUNAS_ESTOQUE, ...linhas.map(valoresEstoque)]
+}
+
+export async function estoqueXlsx(linhas: LinhaEstoque[]) {
+  const dados = [
+    COLUNAS_ESTOQUE.map(value => ({ value, fontWeight: 'bold' as const })),
+    ...linhas.map(l => valoresEstoque(l).map(value => ({ value })))
+  ]
+  return writeXlsxFile(dados, {
+    sheet: 'Estoque',
+    columns: [{ width: 22 }, { width: 12 }, { width: 48 }, { width: 12 }, { width: 9 }, { width: 9 }, { width: 18 }, { width: 22 }]
+  }).toBuffer()
+}
