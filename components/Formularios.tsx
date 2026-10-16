@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { api, formatarQtd } from '@/lib/cliente'
 import type { Produto, ReservaDetalhe, ReservaResumo } from '@/lib/tipos'
 import { ItensMateriais, itensPreenchidos, linhaVazia, type LinhaItem } from './ItensMateriais'
+import { SeletorMaterial } from './SeletorMaterial'
 import { AvisoErro, Campo, ModalFormulario, classeInput, classeTextarea, useEnvio } from './ui'
 
 type Base = { aoFechar: () => void; aoConcluir: (mensagem: string) => void | Promise<void> }
@@ -27,10 +28,7 @@ export function EntradaModal({ produtos, produtoInicial, aoFechar, aoConcluir }:
   return (
     <ModalFormulario titulo="Registrar entrada" descricao="Soma a quantidade ao estoque do material." aoFechar={aoFechar} aoEnviar={enviar} rotuloEnviar="Registrar entrada" enviando={enviando}>
       <Campo rotulo="Material">
-        <select autoFocus={!produtoInicial} value={produtoId} onChange={e => setProdutoId(e.target.value)} className={classeInput}>
-          <option value="">Selecione…</option>
-          {produtos.map(p => <option key={p.id} value={p.id}>{p.codigo ? `${p.codigo} · ` : ''}{p.nome}</option>)}
-        </select>
+        <SeletorMaterial produtos={produtos} valor={produtoId} aoMudar={setProdutoId} autoFocus={!produtoInicial} />
       </Campo>
       <div className="grid grid-cols-2 gap-3">
         <Campo rotulo="Quantidade">

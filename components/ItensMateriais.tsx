@@ -2,6 +2,7 @@
 import { Plus, Trash2 } from 'lucide-react'
 import type { Produto } from '@/lib/tipos'
 import { formatarQtd } from '@/lib/cliente'
+import { SeletorMaterial } from './SeletorMaterial'
 import { classeInput } from './ui'
 
 export type LinhaItem = { produto_id: string; quantidade: string }
@@ -36,12 +37,7 @@ export function ItensMateriais({ produtos, linhas, aoMudar, avisoDisponivel }: {
           return (
             <div key={i} className="px-3 py-2">
               <div className="grid grid-cols-[1fr_120px_36px] items-center gap-2">
-                <select aria-label="Material" value={linha.produto_id} onChange={e => atualizar(i, 'produto_id', e.target.value)} className={classeInput}>
-                  <option value="">Selecione…</option>
-                  {produtos.map(p => (
-                    <option key={p.id} value={p.id}>{p.nome} (disp. {formatarQtd(p.quantidade_disponivel)} {p.unidade})</option>
-                  ))}
-                </select>
+                <SeletorMaterial produtos={produtos} valor={linha.produto_id} aoMudar={id => atualizar(i, 'produto_id', id)} mostrarDisponivel ariaLabel={`Material ${i + 1}`} />
                 <input aria-label="Quantidade" type="number" min="0" step="any" inputMode="decimal" placeholder="0" value={linha.quantidade} onChange={e => atualizar(i, 'quantidade', e.target.value)} className={`${classeInput} text-right`} />
                 <button type="button" aria-label="Remover item" title="Remover item" onClick={() => aoMudar(linhas.filter((_, idx) => idx !== i))} disabled={linhas.length === 1} className="flex h-9 w-9 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-700 disabled:opacity-30 disabled:hover:bg-transparent">
                   <Trash2 size={16} />

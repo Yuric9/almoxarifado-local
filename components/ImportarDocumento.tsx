@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react'
 import { FileText, TriangleAlert, Upload } from 'lucide-react'
 import { api, formatarQtd } from '@/lib/cliente'
 import type { CategoriaResumo, DocumentoLido, Produto } from '@/lib/tipos'
+import { SeletorMaterial } from './SeletorMaterial'
 import { AvisoErro, Badge, Botao, Campo, Modal, classeInput, useEnvio } from './ui'
 
 type Linha = {
@@ -197,10 +198,8 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
                         <input aria-label={`Unidade do item ${i + 1}`} value={l.unidade} onChange={e => atualizar(i, { unidade: e.target.value.toUpperCase() })} className={`${classeInput} h-8`} />
                       </td>
                       <td className="px-2 py-1.5 align-top">
-                        <select aria-label={`Material do item ${i + 1}`} value={l.produto_id} onChange={e => atualizar(i, { produto_id: e.target.value, motivo: null })} className={`${classeInput} h-8`}>
-                          <option value="">+ Criar material novo</option>
-                          {produtos.map(p => <option key={p.id} value={p.id}>{p.codigo ? `${p.codigo} · ` : ''}{p.nome} ({p.unidade})</option>)}
-                        </select>
+                        <SeletorMaterial produtos={produtos} valor={l.produto_id} aoMudar={id => atualizar(i, { produto_id: id, motivo: null })}
+                          rotuloVazio="+ Criar material novo" ariaLabel={`Material do item ${i + 1}`} compacto />
                         <p className="mt-0.5 text-xs">
                           {!l.produto_id && <span className="text-blue-700">Será cadastrado como “{l.descricao}”{modo === 'atualizar' && l.quantidade ? ` com ${l.quantidade} ${l.unidade}` : ''}</span>}
                           {l.produto_id && l.motivo && <span className="text-emerald-700">Encontrado {MOTIVO[l.motivo]}</span>}
