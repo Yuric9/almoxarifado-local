@@ -228,3 +228,66 @@ export async function estoqueXlsx(linhas: LinhaEstoque[]) {
     columns: [{ width: 22 }, { width: 12 }, { width: 48 }, { width: 12 }, { width: 9 }, { width: 9 }, { width: 18 }, { width: 22 }]
   }).toBuffer()
 }
+
+/* ------------------------------------------------------------------ consumo por setor / funcionário */
+
+export type AgrupamentoConsumo = 'setor' | 'funcionario'
+
+export type GrupoConsumo = {
+  nome: string
+  retiradas: number
+  itens: Array<{ produto_id: number; nome: string; unidade: string; quantidade: number }>
+}
+
+/**
+ * Quanto cada setor/obra (ou cada funcionário) retirou no período, material por material.
+ * Considera só retiradas finalizadas (estornadas ficam de fora). Retiradas antigas sem cadastro
+ * entram pelo texto digitado (setor ou nome), agrupadas sem diferenciar maiúsculas.
+ */
+export function relatorioConsumo(inicio: string, fim: string, agrupar: AgrupamentoConsumo) {
+  if (!DATA.test(inicio) || !DATA.test(fim)) throw new Error('Informe datas válidas')
+  if (fim < inicio) throw new Error('A data final deve ser igual ou posterior à inicial')
+  const nomeGrupo = agrupar === 'funcionario'
+    ? "COALESCE(f.nome, NULLIF(TRIM(r.retirado_por),''), 'Sem nome')"
+    : "COALESCE(s.nome, NULLIF(TRIM(r.setor),''), 'Sem setor informado')"
+  const linhas = getDb().prepare(`
+    SELECT ${nomeGrupo} AS grupo, r.id AS requisicao_id, i.produto_id, i.produto_nome AS nome, i.unidade, i.quantidade
+    FROM requisicoes r
+    JOIN requisicao_itens i ON i.requisicao_id=r.id
+    LEFT JOIN setores s ON s.id=r.setor_id
+    LEFT JOIN funcionarios f ON f.id=r.funcionario_id
+    WHERE r.status='FINALIZADA' AND r.criado_em>=? AND r.criado_em<?
+  `).all(limiteUtc(inicio), limiteUtc(diaSeguinte(fim))) as Array<{ grupo: string; requisicao_id: number; produto_id: number; nome: string; unidade: string; quantidade: number }>
+
+  const grupos = new Map<string, { nome: string; retiradas: Set<number>; itens: Map<number, GrupoConsumo['itens'][number]> }>()
+  for (const l of linhas) {
+    const chave = l.grupo.toLocaleLowerCase('pt-BR')
+    const g = grupos.get(chave) ?? { nome: l.grupo, retiradas: new Set<number>(), itens: new Map() }
+    g.retiradas.add(l.requisicao_id)
+    const item = g.itens.get(l.produto_id) ?? { produto_id: l.produto_id, nome: l.nome, unidade: l.unidade, quantidade: 0 }
+    item.quantidade = Math.round((item.quantidade + l.quantidade) * 1000) / 1000
+    g.itens.set(l.produto_id, item)
+    grupos.set(chave, g)
+  }
+  return {
+    inicio, fim, agrupar,
+    grupos: Array.from(grupos.values())
+      .map(g => ({ nome: g.nome, retiradas: g.retiradas.size, itens: Array.from(g.itens.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')) }))
+      .sort((a, b) => b.retiradas - a.retiradas || a.nome.localeCompare(b.nome, 'pt-BR')) as GrupoConsumo[]
+  }
+}
+
+export function consumoLinhas(grupos: GrupoConsumo[], agrupar: AgrupamentoConsumo) {
+  return [
+    [agrupar === 'funcionario' ? 'Funcionário' : 'Setor / obra', 'Material', 'Quantidade', 'Unidade'],
+    ...grupos.flatMap(g => g.itens.map(i => [g.nome, i.nome, i.quantidade, i.unidade]))
+  ]
+}
+
+export async function consumoXlsx(grupos: GrupoConsumo[], agrupar: AgrupamentoConsumo) {
+  const [cabecalho, ...resto] = consumoLinhas(grupos, agrupar)
+  return writeXlsxFile([
+    cabecalho.map(value => ({ value, fontWeight: 'bold' as const })),
+    ...resto.map(l => l.map(value => ({ value })))
+  ], { sheet: 'Consumo', columns: [{ width: 30 }, { width: 48 }, { width: 12 }, { width: 10 }] }).toBuffer()
+}

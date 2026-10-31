@@ -129,6 +129,29 @@ function migrar(db: DB) {
   adicionarColunaSeFaltar(db, 'requisicoes', 'usuario_nome', 'TEXT')
   adicionarColunaSeFaltar(db, 'reservas', 'usuario_nome', 'TEXT')
 
+  // Setores/obras (destino do material) e funcionários (quem retira).
+  db.exec(`
+  CREATE TABLE IF NOT EXISTS setores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    tipo TEXT NOT NULL DEFAULT 'SETOR' CHECK (tipo IN ('SETOR','OBRA')),
+    ativo INTEGER NOT NULL DEFAULT 1,
+    criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS funcionarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    matricula TEXT UNIQUE COLLATE NOCASE,
+    funcao TEXT,
+    setor_id INTEGER REFERENCES setores(id),
+    ativo INTEGER NOT NULL DEFAULT 1,
+    criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  `)
+  adicionarColunaSeFaltar(db, 'requisicoes', 'setor_id', 'INTEGER REFERENCES setores(id)')
+  adicionarColunaSeFaltar(db, 'requisicoes', 'funcionario_id', 'INTEGER REFERENCES funcionarios(id)')
+  vincularSetoresDoHistorico(db)
+
   db.exec(`
   CREATE TABLE IF NOT EXISTS configuracoes (
     chave TEXT PRIMARY KEY,
@@ -156,6 +179,26 @@ function migrar(db: DB) {
 
 function colunaExiste(db: DB, tabela: string, coluna: string) {
   return (db.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string }>).some(c => c.name === coluna)
+}
+
+/**
+ * Retiradas antigas tinham o setor só como texto. Cria os setores que ainda não existem
+ * (sem diferenciar maiúsculas) e liga as retiradas a eles, para o consumo por setor valer
+ * também para o histórico. Só mexe em retiradas ainda sem setor_id.
+ */
+function vincularSetoresDoHistorico(db: DB) {
+  const pendentes = db.prepare("SELECT id, TRIM(setor) AS setor FROM requisicoes WHERE setor_id IS NULL AND TRIM(COALESCE(setor,''))<>''").all() as Array<{ id: number; setor: string }>
+  if (!pendentes.length) return
+  const buscar = db.prepare('SELECT id FROM setores WHERE nome=? COLLATE NOCASE')
+  const criar = db.prepare('INSERT INTO setores (nome) VALUES (?)')
+  const ligar = db.prepare('UPDATE requisicoes SET setor_id=? WHERE id=?')
+  db.transaction(() => {
+    for (const r of pendentes) {
+      const nome = r.setor.replace(/\s+/g, ' ')
+      const existente = buscar.get(nome) as { id: number } | undefined
+      ligar.run(existente?.id ?? Number(criar.run(nome).lastInsertRowid), r.id)
+    }
+  })()
 }
 
 function adicionarColunaSeFaltar(db: DB, tabela: string, coluna: string, definicao: string) {

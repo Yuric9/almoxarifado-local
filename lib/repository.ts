@@ -1,4 +1,5 @@
 import { usuarioAtual } from './auth'
+import { resolverDestino } from './pessoas'
 import { classificarNome, obterOuCriarCategoria } from './classificacao'
 import { lerConfiguracoes } from './configuracoes'
 import { MOTIVOS_BAIXA, type MotivoBaixa } from './constantes'
@@ -523,8 +524,11 @@ export function ajustarEstoque(input: { produto_id: unknown; quantidade_contada:
 /* ------------------------------------------------------------------ requisições */
 
 export type RequisicaoInput = {
-  retirado_por: unknown
+  retirado_por?: unknown
+  /** Funcionário cadastrado (preferível ao nome digitado). */
+  funcionario_id?: unknown
   setor?: unknown
+  setor_id?: unknown
   finalidade?: unknown
   entregue_por?: unknown
   observacao?: unknown
@@ -557,16 +561,18 @@ export function obterRequisicao(id: number) {
 export function criarRequisicao(input: RequisicaoInput) {
   const db = getDb()
   return db.transaction(() => {
-    const nome = texto(input.retirado_por)
+    const destino = resolverDestino(input)
+    const nome = destino.retirado_por
     if (!nome) throw new Error('Nome de quem retirou é obrigatório')
     if (!Array.isArray(input.itens) || !input.itens.length) throw new Error('Adicione pelo menos um material')
     const itens = consolidarItens(input.itens)
     const finalidade = texto(input.finalidade)
 
     const numero = proximoNumero('REQ', 'requisicoes')
-    const req = db.prepare(
-      'INSERT INTO requisicoes (numero,retirado_por,setor,finalidade,entregue_por,observacao,usuario_nome) VALUES (?,?,?,?,?,?,?)'
-    ).run(numero, nome, texto(input.setor), finalidade, texto(input.entregue_por), texto(input.observacao), autor()[1])
+    const req = db.prepare(`
+      INSERT INTO requisicoes (numero,retirado_por,setor,finalidade,entregue_por,observacao,usuario_nome,funcionario_id,setor_id)
+      VALUES (?,?,?,?,?,?,?,?,?)
+    `).run(numero, nome, destino.setor, finalidade, texto(input.entregue_por), texto(input.observacao), autor()[1], destino.funcionario_id, destino.setor_id)
     const requisicaoId = Number(req.lastInsertRowid)
 
     const baixa = db.prepare('UPDATE produtos SET quantidade_atual=quantidade_atual-? WHERE id=?')
@@ -702,10 +708,11 @@ export function atualizarStatusReserva(id: number, status: unknown) {
   if (!result.changes) throw new Error('Reserva não encontrada ou já encerrada')
 }
 
-export function retirarReserva(id: number, retiradoPor: unknown) {
+export function retirarReserva(id: number, retiradoPor: unknown, funcionarioId?: unknown) {
   const db = getDb()
   return db.transaction(() => {
-    const nome = texto(retiradoPor)
+    const destino = resolverDestino({ retirado_por: retiradoPor, funcionario_id: funcionarioId })
+    const nome = destino.retirado_por
     if (!nome) throw new Error('Informe quem está retirando o pedido')
 
     const reserva = db.prepare(`SELECT * FROM reservas WHERE id=? AND status IN ${RESERVAS_ATIVAS}`).get(id) as Reserva | undefined
@@ -716,8 +723,8 @@ export function retirarReserva(id: number, retiradoPor: unknown) {
 
     const numeroReq = proximoNumero('REQ', 'requisicoes')
     const req = db.prepare(
-      'INSERT INTO requisicoes (numero,retirado_por,finalidade,observacao,reserva_id,usuario_nome) VALUES (?,?,?,?,?,?)'
-    ).run(numeroReq, nome, reserva.finalidade, reserva.observacao, id, autor()[1])
+      'INSERT INTO requisicoes (numero,retirado_por,setor,finalidade,observacao,reserva_id,usuario_nome,funcionario_id,setor_id) VALUES (?,?,?,?,?,?,?,?,?)'
+    ).run(numeroReq, nome, destino.setor, reserva.finalidade, reserva.observacao, id, autor()[1], destino.funcionario_id, destino.setor_id)
     const reqId = Number(req.lastInsertRowid)
 
     const estoque = db.prepare('SELECT quantidade_atual FROM produtos WHERE id=?')

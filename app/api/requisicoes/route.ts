@@ -20,7 +20,9 @@ export async function POST(req: Request) {
     const body = await lerJson(req)
     const id = criarRequisicao({
       retirado_por: body.retirado_por,
+      funcionario_id: body.funcionario_id,
       setor: body.setor,
+      setor_id: body.setor_id,
       finalidade: body.finalidade,
       entregue_por: body.entregue_por,
       observacao: body.observacao,

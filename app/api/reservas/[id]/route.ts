@@ -21,7 +21,7 @@ export async function POST(req: Request, { params }: Contexto) {
   try {
     exigir('operacao')
     const body = await lerJson(req)
-    const requisicaoId = retirarReserva(idDaRota(params.id), body.retirado_por)
+    const requisicaoId = retirarReserva(idDaRota(params.id), body.retirado_por, body.funcionario_id)
     return ok({ ok: true, requisicao_id: requisicaoId })
   } catch (e) {
     return falha(e)

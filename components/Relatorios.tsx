@@ -3,7 +3,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Download, FileSpreadsheet, Printer } from 'lucide-react'
 import { api, formatarData, formatarQtd, lerData, mensagemErro } from '@/lib/cliente'
 import { descreverOrigem, type Relatorio } from '@/lib/tipos'
-import type { CategoriaResumo, LinhaEstoque, Produto } from '@/lib/tipos'
+import type { CategoriaResumo, GrupoConsumo, LinhaEstoque, Produto } from '@/lib/tipos'
 import { corQuantidade } from './Telas'
 import { Badge, Botao, CabecalhoPagina, Painel, Tabela, celula, celulaNumero, classeCampo } from './ui'
 
@@ -191,7 +191,97 @@ function Exportar({ url, podeImprimir }: { url: string; podeImprimir: boolean })
   )
 }
 
-type Aba = 'estoque' | 'movimentacao'
+type Aba = 'estoque' | 'movimentacao' | 'consumo'
+
+/** Quanto cada setor/obra ou funcionário retirou no período (só retiradas finalizadas; estornos não contam). */
+function RelatorioConsumo({ empresa }: { empresa?: string }) {
+  const [modo, setModo] = useState<'mes' | 'periodo'>('mes')
+  const [agrupar, setAgrupar] = useState<'setor' | 'funcionario'>('setor')
+  const [mes, setMes] = useState(mesAtual())
+  const [inicio, setInicio] = useState(`${mesAtual()}-01`)
+  const [fim, setFim] = useState(hoje())
+  const [grupos, setGrupos] = useState<GrupoConsumo[] | null>(null)
+  const [erro, setErro] = useState('')
+  const [carregando, setCarregando] = useState(false)
+
+  const periodo = modo === 'mes' ? limitesDoMes(mes) : { inicio, fim }
+  const consulta = `inicio=${periodo.inicio}&fim=${periodo.fim}&agrupar=${agrupar}`
+
+  useEffect(() => {
+    if (!periodo.inicio || !periodo.fim) return
+    setCarregando(true)
+    api<{ grupos: GrupoConsumo[] }>(`/api/relatorios/consumo?${consulta}`)
+      .then(r => { setGrupos(r.grupos); setErro('') })
+      .catch(e => { setGrupos(null); setErro(mensagemErro(e)) })
+      .finally(() => setCarregando(false))
+  }, [consulta, periodo.inicio, periodo.fim])
+
+  const titulo = modo === 'mes'
+    ? new Date(Number(mes.slice(0, 4)), Number(mes.slice(5)) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+    : `${formatarDia(inicio)} a ${formatarDia(fim)}`
+  const rotuloGrupo = agrupar === 'setor' ? 'setor / obra' : 'funcionário'
+  const botao = (ativo: boolean) => `rounded px-3 py-1 font-medium ${ativo ? 'bg-blue-700 text-white' : 'text-slate-600 hover:bg-slate-100'}`
+
+  return (
+    <>
+      <Painel>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <div className="inline-flex rounded-md border border-slate-300 p-0.5" role="tablist" aria-label="Agrupar por">
+            <button role="tab" aria-selected={agrupar === 'setor'} onClick={() => setAgrupar('setor')} className={botao(agrupar === 'setor')}>Por setor / obra</button>
+            <button role="tab" aria-selected={agrupar === 'funcionario'} onClick={() => setAgrupar('funcionario')} className={botao(agrupar === 'funcionario')}>Por funcionário</button>
+          </div>
+          <div className="inline-flex rounded-md border border-slate-300 p-0.5" role="tablist" aria-label="Tipo de período">
+            <button role="tab" aria-selected={modo === 'mes'} onClick={() => setModo('mes')} className={botao(modo === 'mes')}>Mensal</button>
+            <button role="tab" aria-selected={modo === 'periodo'} onClick={() => setModo('periodo')} className={botao(modo === 'periodo')}>Período</button>
+          </div>
+          {modo === 'mes'
+            ? <input type="month" aria-label="Mês" value={mes} onChange={e => setMes(e.target.value)} className={classeCampo} />
+            : (
+              <>
+                <input type="date" aria-label="Data inicial" value={inicio} onChange={e => setInicio(e.target.value)} className={classeCampo} />
+                <span className="text-slate-500">até</span>
+                <input type="date" aria-label="Data final" value={fim} onChange={e => setFim(e.target.value)} className={classeCampo} />
+              </>
+            )}
+          {carregando && <span className="text-slate-500">Carregando…</span>}
+          <Exportar url={`/api/relatorios/consumo?${consulta}`} podeImprimir={!!grupos?.length} />
+        </div>
+      </Painel>
+
+      {erro && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{erro}</p>}
+
+      {grupos && (
+        <div className="print-document mt-5 space-y-5 bg-fundo">
+          <header className="hidden border-b-2 border-slate-900 pb-3 print:block">
+            <p className="text-xs uppercase tracking-widest text-slate-500">{[empresa, 'Almoxarifado'].filter(Boolean).join(' · ')}</p>
+            <h2 className="text-lg font-bold">Consumo por {rotuloGrupo} · {titulo}</h2>
+            <p className="text-xs text-slate-500">Emitido em {new Date().toLocaleString('pt-BR')}</p>
+          </header>
+          {grupos.length === 0 && <p className="py-10 text-center text-sm text-slate-500">Nenhuma retirada no período.</p>}
+          {grupos.map(g => (
+            <Painel key={g.nome} titulo={`${g.nome} · ${g.retiradas} ${g.retiradas === 1 ? 'retirada' : 'retiradas'}`} semPadding>
+              <Tabela colunas={[{ titulo: 'Material' }, { titulo: 'Quantidade', alinhar: 'direita', largura: 'w-36' }, { titulo: 'Un.', largura: 'w-20' }]}>
+                {g.itens.map(i => (
+                  <tr key={i.produto_id}>
+                    <td className={`${celula} font-medium`}>{i.nome}</td>
+                    <td className={`${celulaNumero} font-semibold`}>{formatarQtd(i.quantidade)}</td>
+                    <td className={`${celula} text-slate-500`}>{i.unidade}</td>
+                  </tr>
+                ))}
+              </Tabela>
+            </Painel>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
+const DESCRICOES: Record<Aba, string> = {
+  estoque: 'Listas de materiais: abaixo do mínimo, sem estoque, por categoria ou escolhidos por você',
+  movimentacao: 'Movimentação do estoque por dia, mês ou período',
+  consumo: 'Quanto cada setor, obra ou funcionário retirou no mês ou no período'
+}
 
 export function TelaRelatorios({ empresa, produtos, categorias }: { empresa?: string; produtos: Produto[]; categorias: CategoriaResumo[] }) {
   const [aba, setAba] = useState<Aba>('estoque')
@@ -199,17 +289,19 @@ export function TelaRelatorios({ empresa, produtos, categorias }: { empresa?: st
     <>
       <CabecalhoPagina
         titulo="Relatórios"
-        descricao={aba === 'estoque' ? 'Listas de materiais: abaixo do mínimo, sem estoque, por categoria ou escolhidos por você' : 'Movimentação do estoque por dia, mês ou período'}
+        descricao={DESCRICOES[aba]}
         acoes={
           <div className="inline-flex rounded-md border border-slate-300 bg-superficie p-0.5" role="tablist" aria-label="Tipo de relatório">
-            {([['estoque', 'Estoque'], ['movimentacao', 'Movimentação']] as const).map(([valor, rotulo]) => (
+            {([['estoque', 'Estoque'], ['movimentacao', 'Movimentação'], ['consumo', 'Consumo']] as const).map(([valor, rotulo]) => (
               <button key={valor} role="tab" aria-selected={aba === valor} onClick={() => setAba(valor)}
                 className={`rounded px-4 py-1.5 text-sm font-medium ${aba === valor ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{rotulo}</button>
             ))}
           </div>
         }
       />
-      {aba === 'estoque' ? <RelatorioEstoque empresa={empresa} produtos={produtos} categorias={categorias} /> : <RelatorioMovimentacao empresa={empresa} />}
+      {aba === 'estoque' && <RelatorioEstoque empresa={empresa} produtos={produtos} categorias={categorias} />}
+      {aba === 'movimentacao' && <RelatorioMovimentacao empresa={empresa} />}
+      {aba === 'consumo' && <RelatorioConsumo empresa={empresa} />}
     </>
   )
 }

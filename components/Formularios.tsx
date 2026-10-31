@@ -1,12 +1,24 @@
 'use client'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { api, formatarQtd } from '@/lib/cliente'
-import type { Produto, ReservaDetalhe, ReservaResumo } from '@/lib/tipos'
+import type { Funcionario, Produto, ReservaDetalhe, ReservaResumo, Setor } from '@/lib/tipos'
 import { ItensMateriais, itensPreenchidos, linhaVazia, type LinhaItem } from './ItensMateriais'
+import { SeletorFuncionario, type Pessoa } from './SeletorFuncionario'
 import { SeletorMaterial } from './SeletorMaterial'
 import { AvisoErro, Campo, ModalFormulario, classeInput, classeTextarea, useEnvio } from './ui'
 
 type Base = { aoFechar: () => void; aoConcluir: (mensagem: string) => void | Promise<void> }
+
+/** Funcionários e setores cadastrados, para a retirada. */
+function usePessoas() {
+  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([])
+  const [setores, setSetores] = useState<Setor[]>([])
+  useEffect(() => {
+    api<Funcionario[]>('/api/funcionarios').then(setFuncionarios).catch(() => {})
+    api<Setor[]>('/api/setores').then(setSetores).catch(() => {})
+  }, [])
+  return { funcionarios, setores: setores.filter(s => s.ativo) }
+}
 
 export function EntradaModal({ produtos, produtoInicial, aoFechar, aoConcluir }: Base & { produtos: Produto[]; produtoInicial?: number }) {
   const [produtoId, setProdutoId] = useState(produtoInicial ? String(produtoInicial) : '')
@@ -51,8 +63,17 @@ export function RequisicaoModal({ produtos, entreguePorPadrao, aoFechar, aoConcl
   entreguePorPadrao?: string
   aoConcluir: (id: number) => void | Promise<void>
 }) {
-  const [dados, setDados] = useState({ retirado_por: '', setor: '', finalidade: '', entregue_por: entreguePorPadrao || '', observacao: '' })
+  const [dados, setDados] = useState({ setor_id: '', finalidade: '', entregue_por: entreguePorPadrao || '', observacao: '' })
+  const [pessoa, setPessoa] = useState<Pessoa>({ funcionario_id: null, nome: '' })
+  const { funcionarios, setores } = usePessoas()
   const [linhas, setLinhas] = useState<LinhaItem[]>([linhaVazia()])
+
+  // Ao escolher um funcionário cadastrado, o setor dele vem preenchido (dá para trocar).
+  function escolherPessoa(p: Pessoa) {
+    setPessoa(p)
+    const f = p.funcionario_id ? funcionarios.find(x => x.id === p.funcionario_id) : undefined
+    if (f?.setor_id && setores.some(s => s.id === f.setor_id)) setDados(d => ({ ...d, setor_id: String(f.setor_id) }))
+  }
   const { enviando, erro, executar } = useEnvio()
   const campo = (nome: keyof typeof dados) => (e: { target: { value: string } }) => setDados({ ...dados, [nome]: e.target.value })
 
@@ -61,7 +82,10 @@ export function RequisicaoModal({ produtos, entreguePorPadrao, aoFechar, aoConcl
     executar(async () => {
       const itens = itensPreenchidos(linhas)
       if (!itens.length) throw new Error('Adicione pelo menos um material com quantidade')
-      const { id } = await api<{ id: number }>('/api/requisicoes', { method: 'POST', json: { ...dados, itens } })
+      const { id } = await api<{ id: number }>('/api/requisicoes', {
+        method: 'POST',
+        json: { ...dados, setor_id: dados.setor_id ? Number(dados.setor_id) : null, funcionario_id: pessoa.funcionario_id, retirado_por: pessoa.nome, itens }
+      })
       await aoConcluir(id)
     })
   }
@@ -69,8 +93,13 @@ export function RequisicaoModal({ produtos, entreguePorPadrao, aoFechar, aoConcl
   return (
     <ModalFormulario titulo="Nova requisição de retirada" descricao="Baixa os materiais do estoque e gera o comprovante." aoFechar={aoFechar} largura="max-w-2xl" aoEnviar={enviar} rotuloEnviar="Registrar retirada" enviando={enviando}>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Campo rotulo="Retirado por"><input autoFocus required value={dados.retirado_por} onChange={campo('retirado_por')} className={classeInput} /></Campo>
-        <Campo rotulo="Setor" opcional><input value={dados.setor} onChange={campo('setor')} className={classeInput} /></Campo>
+        <Campo rotulo="Retirado por"><SeletorFuncionario funcionarios={funcionarios} valor={pessoa} aoMudar={escolherPessoa} autoFocus /></Campo>
+        <Campo rotulo="Setor / obra" opcional>
+          <select value={dados.setor_id} onChange={campo('setor_id')} className={classeInput}>
+            <option value="">{setores.length ? '— Não informado —' : 'Cadastre em Pessoas e setores'}</option>
+            {setores.map(s => <option key={s.id} value={s.id}>{s.tipo === 'OBRA' ? 'Obra: ' : ''}{s.nome}</option>)}
+          </select>
+        </Campo>
         <Campo rotulo="Finalidade" opcional><input value={dados.finalidade} onChange={campo('finalidade')} className={classeInput} /></Campo>
         <Campo rotulo="Entregue por" opcional><input value={dados.entregue_por} onChange={campo('entregue_por')} className={classeInput} /></Campo>
       </div>
@@ -148,13 +177,14 @@ export function RetirarReservaModal({ reserva, aoFechar, aoConcluir }: Omit<Base
   reserva: Pick<ReservaResumo, 'id' | 'numero' | 'finalidade'>
   aoConcluir: (requisicaoId: number) => void | Promise<void>
 }) {
-  const [nome, setNome] = useState('')
+  const [pessoa, setPessoa] = useState<Pessoa>({ funcionario_id: null, nome: '' })
+  const { funcionarios } = usePessoas()
   const { enviando, erro, executar } = useEnvio()
 
   const enviar = (e: FormEvent) => {
     e.preventDefault()
     executar(async () => {
-      const { requisicao_id } = await api<{ requisicao_id: number }>(`/api/reservas/${reserva.id}`, { method: 'POST', json: { retirado_por: nome } })
+      const { requisicao_id } = await api<{ requisicao_id: number }>(`/api/reservas/${reserva.id}`, { method: 'POST', json: { retirado_por: pessoa.nome, funcionario_id: pessoa.funcionario_id } })
       await aoConcluir(requisicao_id)
     })
   }
@@ -162,7 +192,7 @@ export function RetirarReservaModal({ reserva, aoFechar, aoConcluir }: Omit<Base
   return (
     <ModalFormulario titulo="Retirar reserva" descricao={`${reserva.numero} · ${reserva.finalidade}`} aoFechar={aoFechar} aoEnviar={enviar} rotuloEnviar="Confirmar retirada" enviando={enviando}>
       <Campo rotulo="Retirado por">
-        <input autoFocus required value={nome} onChange={e => setNome(e.target.value)} className={classeInput} />
+        <SeletorFuncionario funcionarios={funcionarios} valor={pessoa} aoMudar={setPessoa} autoFocus />
       </Campo>
       <AvisoErro texto={erro} />
     </ModalFormulario>
