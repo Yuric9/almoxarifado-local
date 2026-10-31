@@ -5,6 +5,7 @@ import { api, formatarData, formatarQtd, mensagemErro } from '@/lib/cliente'
 import type { ReservaDetalhe as Detalhe } from '@/lib/tipos'
 import { AvisoErro, Botao, Modal, Tabela, celula, celulaNumero } from './ui'
 import { StatusReserva } from './Telas'
+import { usePode } from './Perfil'
 
 export function ReservaDetalhe({ reservaId, versao, aoFechar, aoEditar, aoRetirar, aoAguardar, aoCancelar, abrirComprovante }: {
   reservaId: number
@@ -17,6 +18,7 @@ export function ReservaDetalhe({ reservaId, versao, aoFechar, aoEditar, aoRetira
   aoCancelar: (r: Detalhe) => void
   abrirComprovante: (requisicaoId: number) => void
 }) {
+  const podeOperar = usePode('operacao')
   const [reserva, setReserva] = useState<Detalhe | null>(null)
   const [erro, setErro] = useState('')
 
@@ -59,7 +61,7 @@ export function ReservaDetalhe({ reservaId, versao, aoFechar, aoEditar, aoRetira
           <AvisoErro texto={erro} />
 
           <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
-            {aberta && (
+            {aberta && podeOperar && (
               <>
                 <Botao onClick={() => aoEditar(reserva)} icone={<Pencil size={16} />}>Editar</Botao>
                 {reserva.status === 'SEPARADO' && <Botao onClick={() => aoAguardar(reserva)} icone={<CheckCircle2 size={16} />}>Marcar pronto</Botao>}

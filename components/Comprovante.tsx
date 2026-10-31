@@ -4,6 +4,7 @@ import { Printer, Undo2, X } from 'lucide-react'
 import { api, formatarData, formatarQtd } from '@/lib/cliente'
 import type { RequisicaoDetalhe } from '@/lib/tipos'
 import { AvisoErro, Botao, Campo, ModalFormulario, classeInput, useEnvio, useFecharComEsc } from './ui'
+import { usePode } from './Perfil'
 
 export function Comprovante({ requisicao, empresa, setor, aoFechar, aoEstornar }: {
   requisicao: RequisicaoDetalhe
@@ -12,6 +13,7 @@ export function Comprovante({ requisicao, empresa, setor, aoFechar, aoEstornar }
   aoFechar: () => void
   aoEstornar: (mensagem: string) => Promise<void>
 }) {
+  const admin = usePode('admin')
   const id = useId()
   const [estornando, setEstornando] = useState(false)
   useFecharComEsc(id, aoFechar)
@@ -22,7 +24,7 @@ export function Comprovante({ requisicao, empresa, setor, aoFechar, aoEstornar }
   return (
     <div data-dialogo={id} className="print-overlay fixed inset-0 z-50 flex flex-col items-center overflow-auto bg-black/50 p-4">
       <div className="mb-3 flex w-full max-w-[210mm] justify-end gap-2 print:hidden">
-        {!cancelada && <Botao variante="perigo" onClick={() => setEstornando(true)} icone={<Undo2 size={16} />}>Estornar retirada</Botao>}
+        {!cancelada && admin && <Botao variante="perigo" onClick={() => setEstornando(true)} icone={<Undo2 size={16} />}>Estornar retirada</Botao>}
         <span className="flex-1" />
         <Botao onClick={aoFechar} icone={<X size={16} />}>Fechar</Botao>
         <Botao variante="primario" onClick={() => window.print()} icone={<Printer size={16} />}>Imprimir</Botao>
@@ -86,8 +88,9 @@ export function Comprovante({ requisicao, empresa, setor, aoFechar, aoEstornar }
 
         <div className="mt-16 grid grid-cols-2 gap-12 text-center text-xs text-slate-600">
           <div className="border-t border-slate-400 pt-2">{requisicao.retirado_por}<br />Recebedor</div>
-          <div className="border-t border-slate-400 pt-2">{requisicao.entregue_por || ' '}<br />Responsável pela entrega</div>
+          <div className="border-t border-slate-400 pt-2">{requisicao.entregue_por || requisicao.usuario_nome || ' '}<br />Responsável pela entrega</div>
         </div>
+        {requisicao.usuario_nome && <p className="mt-6 text-center text-[10px] text-slate-400">Registrado no sistema por {requisicao.usuario_nome}</p>}
       </article>
 
       {estornando && (

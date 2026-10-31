@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { falha, ok } from '@/lib/api'
 import { criarBackup, listarBackups } from '@/lib/backup'
 import { pastaBackups } from '@/lib/paths'
+import { exigir } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -11,6 +12,7 @@ export const dynamic = 'force-dynamic'
 /** Lista os backups ou baixa um deles (?arquivo=nome.db). */
 export function GET(req: Request) {
   try {
+    exigir('operacao')
     const arquivo = new URL(req.url).searchParams.get('arquivo')
     if (!arquivo) return ok({ pasta: pastaBackups(), backups: listarBackups() })
 
@@ -34,6 +36,7 @@ export function GET(req: Request) {
 /** Cria um backup na pasta de dados (no HD, na versão portátil). */
 export function POST() {
   try {
+    exigir('operacao')
     const caminho = criarBackup('manual')
     return ok({ ok: true, arquivo: path.basename(caminho), pasta: pastaBackups() }, 201)
   } catch (e) {

@@ -1,5 +1,6 @@
 import { falha, idDaRota, lerJson, ok } from '@/lib/api'
 import { registrarBaixa } from '@/lib/repository'
+import { exigir } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -7,6 +8,7 @@ export const dynamic = 'force-dynamic'
 /** Baixa por perda, roubo, vencimento ou quebra. */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
+    exigir('operacao')
     const body = await lerJson(req)
     registrarBaixa({
       produto_id: idDaRota(params.id),

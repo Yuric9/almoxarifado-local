@@ -3,6 +3,8 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Check, Monitor, Moon, Pencil, Plus, Sun, Trash2, X } from 'lucide-react'
 import { api, mensagemErro } from '@/lib/cliente'
 import type { CategoriaResumo, Configuracoes, Sistema, Tema } from '@/lib/tipos'
+import { usePode } from './Perfil'
+import { GerenciarUsuarios, MinhaSenha } from './Usuarios'
 import { Botao, CabecalhoPagina, Campo, Painel, Tabela, celula, celulaNumero, classeInput } from './ui'
 
 export function TelaConfiguracoes({ config, sistema, categorias, aoSalvar, aoAlterarCategorias, notificar, abrirBackup, abrirPlanilhas }: {
@@ -15,6 +17,7 @@ export function TelaConfiguracoes({ config, sistema, categorias, aoSalvar, aoAlt
   abrirBackup: () => void
   abrirPlanilhas: () => void
 }) {
+  const admin = usePode('admin')
   const [form, setForm] = useState(config)
   const [salvando, setSalvando] = useState(false)
   useEffect(() => setForm(config), [config])
@@ -48,7 +51,9 @@ export function TelaConfiguracoes({ config, sistema, categorias, aoSalvar, aoAlt
             </div>
           </Painel>
 
-          <Painel titulo="Empresa e padrões">
+          <MinhaSenha notificar={notificar} />
+
+          {admin && <Painel titulo="Empresa e padrões">
             <form
               className="space-y-4"
               onSubmit={e => {
@@ -84,7 +89,7 @@ export function TelaConfiguracoes({ config, sistema, categorias, aoSalvar, aoAlt
                 <Botao type="submit" variante="primario" disabled={!alterado || salvando}>Salvar</Botao>
               </div>
             </form>
-          </Painel>
+          </Painel>}
 
           <Painel titulo="Dados e sistema">
             <dl className="grid grid-cols-[140px_1fr] gap-y-2 text-sm">
@@ -92,14 +97,21 @@ export function TelaConfiguracoes({ config, sistema, categorias, aoSalvar, aoAlt
               <dt className="text-slate-500">Modo</dt><dd className="text-slate-900">{sistema?.modo === 'portatil' ? 'Portátil (dados junto ao programa)' : sistema?.modo === 'instalado' ? 'Instalado' : 'Desenvolvimento'}</dd>
               <dt className="text-slate-500">Pasta de dados</dt><dd className="break-all font-mono text-xs text-slate-900">{sistema?.pasta_dados || '—'}</dd>
             </dl>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Botao onClick={abrirBackup}>Backup e restauração</Botao>
-              <Botao onClick={abrirPlanilhas}>Importar / exportar planilhas</Botao>
-            </div>
+            {admin && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Botao onClick={abrirBackup}>Backup e restauração</Botao>
+                <Botao onClick={abrirPlanilhas}>Importar / exportar planilhas</Botao>
+              </div>
+            )}
           </Painel>
         </div>
 
-        <GerenciarCategorias categorias={categorias} aoAlterar={aoAlterarCategorias} notificar={notificar} />
+        {admin && (
+          <div className="space-y-5">
+            <GerenciarUsuarios notificar={notificar} />
+            <GerenciarCategorias categorias={categorias} aoAlterar={aoAlterarCategorias} notificar={notificar} />
+          </div>
+        )}
       </div>
       <p className="mt-8 text-center text-[11px] text-slate-400">Almoxarifado Local · Sistema desenvolvido por YC Soluções Tecnológicas</p>
     </>

@@ -1,6 +1,7 @@
 import { arquivo, falha, ok, TIPO_CSV, TIPO_XLSX } from '@/lib/api'
 import { gerarCsv } from '@/lib/planilha'
 import { descreverOrigem, relatorioPeriodo, relatorioXlsx } from '@/lib/relatorios'
+import { exigir } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -8,6 +9,7 @@ export const dynamic = 'force-dynamic'
 /** ?inicio=AAAA-MM-DD&fim=AAAA-MM-DD[&formato=xlsx|csv] */
 export async function GET(req: Request) {
   try {
+    exigir('leitura')
     const q = new URL(req.url).searchParams
     const r = relatorioPeriodo(q.get('inicio') || '', q.get('fim') || '')
     const nome = `relatorio-${r.inicio}_${r.fim}`

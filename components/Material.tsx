@@ -6,6 +6,7 @@ import { MOTIVOS_BAIXA, UNIDADES, descreverOrigem, type CategoriaResumo, type Pr
 import { EntradaModal } from './Formularios'
 import { SeletorMaterial } from './SeletorMaterial'
 import { AvisoErro, Badge, Botao, Campo, Modal, ModalFormulario, Tabela, celula, celulaNumero, classeInput, useEnvio } from './ui'
+import { usePode } from './Perfil'
 
 type AoConcluir = (mensagem: string) => void | Promise<void>
 
@@ -250,6 +251,8 @@ export function FichaMaterial({ produtoId, produtos, categorias, aoFechar, aoAlt
   abrirComprovante: (requisicaoId: number) => void
   abrirReserva: (reservaId: number) => void
 }) {
+  const podeOperar = usePode('operacao')
+  const admin = usePode('admin')
   const [ficha, setFicha] = useState<ProdutoFicha | null>(null)
   const [acao, setAcao] = useState<Acao>(null)
   const [erro, setErro] = useState('')
@@ -307,15 +310,17 @@ export function FichaMaterial({ produtoId, produtos, categorias, aoFechar, aoAlt
               <Numero rotulo="Estoque mínimo" valor={`${formatarQtd(ficha.estoque_minimo)} ${ficha.unidade}`} alerta={ficha.quantidade_atual <= ficha.estoque_minimo} />
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Botao disabled={!ficha.ativo} onClick={() => setAcao('entrada')} icone={<ArrowDownToLine size={16} />}>Entrada</Botao>
-              <Botao disabled={!ficha.ativo} onClick={() => setAcao('baixa')} icone={<PackageMinus size={16} />}>Dar baixa</Botao>
-              <Botao disabled={!ficha.ativo} onClick={() => setAcao('ajuste')} icone={<ClipboardCheck size={16} />}>Ajustar estoque</Botao>
-              <Botao onClick={() => setAcao('editar')} icone={<Pencil size={16} />}>Editar</Botao>
-              <span className="flex-1" />
-              <Botao variante="fantasma" onClick={alternarAtivo} icone={<Power size={16} />}>{ficha.ativo ? 'Inativar' : 'Reativar'}</Botao>
-              <Botao variante="perigo" onClick={excluir} icone={<Trash2 size={16} />}>Excluir</Botao>
-            </div>
+            {podeOperar && (
+              <div className="flex flex-wrap gap-2">
+                <Botao disabled={!ficha.ativo} onClick={() => setAcao('entrada')} icone={<ArrowDownToLine size={16} />}>Entrada</Botao>
+                <Botao disabled={!ficha.ativo} onClick={() => setAcao('baixa')} icone={<PackageMinus size={16} />}>Dar baixa</Botao>
+                {admin && <Botao disabled={!ficha.ativo} onClick={() => setAcao('ajuste')} icone={<ClipboardCheck size={16} />}>Ajustar estoque</Botao>}
+                <Botao onClick={() => setAcao('editar')} icone={<Pencil size={16} />}>Editar</Botao>
+                <span className="flex-1" />
+                <Botao variante="fantasma" onClick={alternarAtivo} icone={<Power size={16} />}>{ficha.ativo ? 'Inativar' : 'Reativar'}</Botao>
+                {admin && <Botao variante="perigo" onClick={excluir} icone={<Trash2 size={16} />}>Excluir</Botao>}
+              </div>
+            )}
             <AvisoErro texto={erro} />
 
             {ficha.reservas.length > 0 && (
@@ -338,13 +343,14 @@ export function FichaMaterial({ produtoId, produtos, categorias, aoFechar, aoAlt
             <section>
               <h3 className="mb-2 text-sm font-semibold text-slate-900">Histórico</h3>
               <div className="max-h-80 overflow-auto rounded-md border border-slate-200">
-                <Tabela colunas={[{ titulo: 'Data' }, { titulo: 'Movimento' }, { titulo: 'Quantidade', alinhar: 'direita' }, { titulo: 'Responsável' }, { titulo: 'Observação' }]} vazio="Sem movimentações.">
+                <Tabela colunas={[{ titulo: 'Data' }, { titulo: 'Movimento' }, { titulo: 'Quantidade', alinhar: 'direita' }, { titulo: 'Responsável' }, { titulo: 'Registrado por' }, { titulo: 'Observação' }]} vazio="Sem movimentações.">
                   {ficha.movimentacoes.map(m => (
                     <tr key={m.id} onClick={m.requisicao_id ? () => abrirComprovante(m.requisicao_id!) : undefined} className={m.requisicao_id ? 'cursor-pointer hover:bg-slate-50' : ''}>
                       <td className={`${celula} whitespace-nowrap text-slate-600`}>{formatarData(m.criado_em)}</td>
                       <td className={celula}><Badge tom={m.origem === 'BAIXA' ? 'vermelho' : m.tipo === 'ENTRADA' ? 'verde' : 'neutro'}>{descreverOrigem(m)}</Badge></td>
                       <td className={`${celulaNumero} whitespace-nowrap`}>{m.tipo === 'SAIDA' ? '−' : '+'}{formatarQtd(m.quantidade)}</td>
                       <td className={`${celula} text-slate-600`}>{m.responsavel || '—'}</td>
+                      <td className={`${celula} text-slate-500`}>{m.usuario_nome || '—'}</td>
                       <td className={`${celula} max-w-xs truncate text-slate-500`} title={m.observacao || ''}>{m.observacao || '—'}</td>
                     </tr>
                   ))}

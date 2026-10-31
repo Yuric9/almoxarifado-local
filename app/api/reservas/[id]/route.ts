@@ -1,5 +1,6 @@
 import { falha, idDaRota, lerJson, ok } from '@/lib/api'
 import { atualizarReserva, atualizarStatusReserva, cancelarReserva, obterReserva, retirarReserva, type ItemInput } from '@/lib/repository'
+import { exigir } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -8,6 +9,7 @@ type Contexto = { params: { id: string } }
 
 export function GET(_req: Request, { params }: Contexto) {
   try {
+    exigir('leitura')
     return ok(obterReserva(idDaRota(params.id)))
   } catch (e) {
     return falha(e, 404)
@@ -17,6 +19,7 @@ export function GET(_req: Request, { params }: Contexto) {
 /** Retira o pedido reservado: baixa o estoque e gera uma requisição. */
 export async function POST(req: Request, { params }: Contexto) {
   try {
+    exigir('operacao')
     const body = await lerJson(req)
     const requisicaoId = retirarReserva(idDaRota(params.id), body.retirado_por)
     return ok({ ok: true, requisicao_id: requisicaoId })
@@ -27,6 +30,7 @@ export async function POST(req: Request, { params }: Contexto) {
 
 export async function PATCH(req: Request, { params }: Contexto) {
   try {
+    exigir('operacao')
     const body = await lerJson(req)
     atualizarStatusReserva(idDaRota(params.id), body.status)
     return ok({ ok: true })
@@ -38,6 +42,7 @@ export async function PATCH(req: Request, { params }: Contexto) {
 /** Edita dados e materiais de uma reserva aberta. */
 export async function PUT(req: Request, { params }: Contexto) {
   try {
+    exigir('operacao')
     const body = await lerJson(req)
     atualizarReserva(idDaRota(params.id), {
       finalidade: body.finalidade,
@@ -53,6 +58,7 @@ export async function PUT(req: Request, { params }: Contexto) {
 
 export function DELETE(_req: Request, { params }: Contexto) {
   try {
+    exigir('operacao')
     cancelarReserva(idDaRota(params.id))
     return ok({ ok: true })
   } catch (e) {

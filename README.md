@@ -6,6 +6,7 @@ Feito com Next.js 14, React 18, Tailwind CSS, SQLite (`better-sqlite3`) e Electr
 
 ## Funcionalidades
 
+- **Usuários e login**: cada pessoa entra com usuário e senha. Perfis: **Administrador** (tudo, inclusive usuários, configurações, ajuste de inventário, estornos, exclusões e restauração de backup), **Almoxarife** (entradas, retiradas, reservas, baixas, materiais e importações) e **Consulta** (só vê e tira relatórios). Toda movimentação, retirada e reserva registra **quem registrou** (coluna "Registrado por"). Senhas guardadas só como hash (scrypt). Na primeira abertura o sistema pede para criar o administrador. **Esqueceu a senha do administrador?** Crie um arquivo `REDEFINIR-SENHA.txt` (pode ser vazio) na pasta de dados e abra o sistema: ele deixa definir uma nova senha e apaga o arquivo.
 - **Painel** com indicadores clicáveis (materiais, abaixo do mínimo, reservas abertas, movimentações do dia).
 - **Materiais** com código, categoria, unidade, localização e estoque mínimo. Clicar em um material abre a **ficha**, com histórico, reservas e as ações de entrada, baixa, ajuste, edição, inativação e exclusão.
 - **Entrada rápida**: material, quantidade e observação.
@@ -21,7 +22,7 @@ Feito com Next.js 14, React 18, Tailwind CSS, SQLite (`better-sqlite3`) e Electr
 - **Configurações**: tema claro, escuro ou igual ao Windows; nome da empresa no comprovante; padrões; e categorias (criar, renomear, mudar cor e excluir).
 - **Backup automático diário**, backup manual e **restauração** pela própria tela.
 - Diferencia **estoque físico**, **reservado** e **disponível**. Uma retirada comum nunca consome material reservado.
-- **Auditoria**: toda movimentação registra a origem (estoque inicial, entrada, retirada, reserva, baixa, ajuste ou estorno), o motivo e o vínculo com a requisição.
+- **Auditoria**: toda movimentação registra o usuário que registrou, a origem (estoque inicial, entrada, retirada, reserva, baixa, ajuste ou estorno), o motivo e o vínculo com a requisição.
 
 ## Uso no HD externo (modo portátil)
 

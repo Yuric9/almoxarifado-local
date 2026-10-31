@@ -4,6 +4,7 @@ import { ArrowDownToLine, ArrowUpFromLine, ChevronRight, Ellipsis, FileSpreadshe
 import { api, ehHoje, formatarDataCurta, formatarQtd, mensagemErro } from '@/lib/cliente'
 import { descreverOrigem, type CategoriaResumo, type Movimentacao, type Produto, type RequisicaoResumo, type ReservaResumo } from '@/lib/tipos'
 import { Badge, Botao, CabecalhoPagina, MenuAcoes, Painel, Tabela, celula, celulaNumero, classeCampo } from './ui'
+import { usePode } from './Perfil'
 
 const linhaClicavel = 'cursor-pointer hover:bg-slate-50'
 
@@ -135,6 +136,7 @@ export function TelaMateriais({ produtos, categorias, carregando, filtroAlerta, 
   aoClassificar: () => void
   abrirMaterial: (id: number) => void
 }) {
+  const podeOperar = usePode('operacao')
   const [busca, setBusca] = useState('')
   const [categoria, setCategoria] = useState('')
   const [soAlerta, setSoAlerta] = useState(!!filtroAlerta)
@@ -156,7 +158,7 @@ export function TelaMateriais({ produtos, categorias, carregando, filtroAlerta, 
       <CabecalhoPagina
         titulo="Materiais"
         descricao="Clique em um material para ver a ficha, editar, dar baixa ou ajustar o estoque"
-        acoes={<>
+        acoes={podeOperar && <>
           <MenuAcoes rotulo="Mais opções" icone={<Ellipsis size={16} />} itens={[
             { rotulo: 'Importar documento', descricao: 'Nota fiscal (XML ou PDF), pedido ou lista', icone: <FileUp size={16} />, aoClicar: aoImportarDocumento },
             { rotulo: 'Planilhas', descricao: 'Importar ou exportar materiais em Excel', icone: <FileSpreadsheet size={16} />, aoClicar: aoPlanilhas },
@@ -222,6 +224,7 @@ export function TelaRetiradas({ requisicoes, aoNova, aoComprovante }: {
   aoNova: () => void
   aoComprovante: (id: number) => void
 }) {
+  const podeOperar = usePode('operacao')
   const [busca, setBusca] = useState('')
   const termo = busca.trim().toLocaleLowerCase('pt-BR')
   const lista = requisicoes.filter(r => [r.numero, r.retirado_por, r.setor, r.finalidade].some(v => v?.toLocaleLowerCase('pt-BR').includes(termo)))
@@ -231,7 +234,7 @@ export function TelaRetiradas({ requisicoes, aoNova, aoComprovante }: {
       <CabecalhoPagina
         titulo="Retiradas"
         descricao="Requisições de material. Clique em uma linha para ver, imprimir ou estornar o comprovante."
-        acoes={<Botao variante="primario" onClick={aoNova} icone={<Plus size={16} />}>Nova retirada</Botao>}
+        acoes={podeOperar && <Botao variante="primario" onClick={aoNova} icone={<Plus size={16} />}>Nova retirada</Botao>}
       />
       <Painel semPadding>
         <div className="border-b border-slate-200 p-3">
@@ -269,6 +272,7 @@ export function TelaReservas({ reservas, aoNova, abrirReserva }: {
   aoNova: () => void
   abrirReserva: (id: number) => void
 }) {
+  const podeOperar = usePode('operacao')
   const [mostrarEncerradas, setMostrarEncerradas] = useState(false)
   const lista = mostrarEncerradas ? reservas : reservas.filter(r => r.status === 'SEPARADO' || r.status === 'AGUARDANDO_RETIRADA')
 
@@ -277,7 +281,7 @@ export function TelaReservas({ reservas, aoNova, abrirReserva }: {
       <CabecalhoPagina
         titulo="Reservas"
         descricao="Pedidos separados. Clique em um pedido para ver os itens, editar, retirar ou cancelar."
-        acoes={<Botao variante="primario" onClick={aoNova} icone={<Plus size={16} />}>Nova reserva</Botao>}
+        acoes={podeOperar && <Botao variante="primario" onClick={aoNova} icone={<Plus size={16} />}>Nova reserva</Botao>}
       />
       <Painel semPadding>
         <div className="flex items-center border-b border-slate-200 p-3">
@@ -359,7 +363,7 @@ export function TelaMovimentacoes({ filtroHoje, versao, abrirMaterial, abrirComp
         </div>
         {erro && <p className="px-4 py-2 text-sm text-red-700">{erro}</p>}
         <Tabela
-          colunas={[{ titulo: 'Data' }, { titulo: 'Movimento' }, { titulo: 'Material' }, { titulo: 'Quantidade', alinhar: 'direita' }, { titulo: 'Responsável' }, { titulo: 'Observação' }]}
+          colunas={[{ titulo: 'Data' }, { titulo: 'Movimento' }, { titulo: 'Material' }, { titulo: 'Quantidade', alinhar: 'direita' }, { titulo: 'Responsável' }, { titulo: 'Registrado por' }, { titulo: 'Observação' }]}
           vazio="Nenhuma movimentação no período."
         >
           {lista.map(m => (
@@ -369,6 +373,7 @@ export function TelaMovimentacoes({ filtroHoje, versao, abrirMaterial, abrirComp
               <td className={`${celula} font-medium`}>{m.produto_nome}</td>
               <td className={`${celulaNumero} whitespace-nowrap`}>{m.tipo === 'SAIDA' ? '−' : '+'}{formatarQtd(m.quantidade)} {m.unidade}</td>
               <td className={`${celula} text-slate-600`}>{m.responsavel || '—'}</td>
+              <td className={`${celula} text-slate-500`}>{m.usuario_nome || '—'}</td>
               <td className={`${celula} max-w-xs truncate text-slate-500`} title={m.observacao || ''}>{m.observacao && m.observacao !== descreverOrigem(m) ? m.observacao : <span className="text-slate-400">—</span>}</td>
             </tr>
           ))}

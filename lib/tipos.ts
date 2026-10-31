@@ -4,8 +4,9 @@ export type { Configuracoes, Tema } from './configuracoes'
 export type { Relatorio, LinhaEstoque } from './relatorios'
 export type { ResultadoImportacao } from './planilha'
 export type { DocumentoLido } from './documento'
+export type { Usuario } from './auth'
 export type { ItemClassificacao, Sugestao as SugestaoCategoria } from './classificacao'
-export { UNIDADES, MOTIVOS_BAIXA, ORIGENS, descreverOrigem, type MotivoBaixa } from './constantes'
+export { UNIDADES, MOTIVOS_BAIXA, ORIGENS, PERFIS, descreverOrigem, type MotivoBaixa, type Perfil } from './constantes'
 import type { Categoria, ItemDocumento, Movimentacao, Produto, Requisicao, Reserva, StatusReserva } from './repository'
 
 export type CategoriaResumo = Categoria & { total_materiais: number }

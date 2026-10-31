@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
+import { ErroAcesso } from './auth'
 
 export function ok<T>(dados: T, status = 200) {
   return NextResponse.json(dados, { status })
 }
 
 export function falha(e: unknown, status = 400) {
+  if (e instanceof ErroAcesso) status = e.status
   const mensagem = e instanceof Error ? e.message : 'Erro inesperado'
   if (status >= 500) console.error(e)
   return NextResponse.json({ error: mensagem }, { status })

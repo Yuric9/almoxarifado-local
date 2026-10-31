@@ -9,6 +9,8 @@ export async function api<T = unknown>(url: string, init?: RequestInit & { json?
     cache: 'no-store'
   })
   const dados = await res.json().catch(() => ({}))
+  // Sessão expirada ou encerrada: a tela principal volta para o login.
+  if (res.status === 401 && !url.startsWith('/api/auth')) window.dispatchEvent(new Event('sessao-expirada'))
   if (!res.ok) throw new Error((dados as { error?: string }).error || `Erro ${res.status}`)
   return dados as T
 }

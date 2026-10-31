@@ -1,7 +1,14 @@
+import { usuarioAtual } from './auth'
 import { classificarNome, obterOuCriarCategoria } from './classificacao'
 import { lerConfiguracoes } from './configuracoes'
 import { MOTIVOS_BAIXA, type MotivoBaixa } from './constantes'
 import { getDb } from './db'
+
+/** Quem está registrando a operação (vem do login); [id, nome]. */
+function autor(): [number | null, string | null] {
+  const u = usuarioAtual()
+  return [u?.id ?? null, u?.nome ?? null]
+}
 
 const RESERVAS_ATIVAS = "('SEPARADO','AGUARDANDO_RETIRADA')"
 
@@ -33,6 +40,8 @@ export type Movimentacao = {
   requisicao_id: number | null
   origem: string
   motivo: string | null
+  /** Usuário logado que registrou (vazio em registros anteriores ao login). */
+  usuario_nome: string | null
   criado_em: string
   produto_nome: string
   unidade: string
@@ -55,6 +64,7 @@ export type Requisicao = {
   status: 'FINALIZADA' | 'CANCELADA'
   cancelada_em: string | null
   motivo_cancelamento: string | null
+  usuario_nome: string | null
   criado_em: string
 }
 
@@ -74,6 +84,7 @@ export type Reserva = {
   finalidade: string
   reservado_por: string | null
   observacao: string | null
+  usuario_nome: string | null
   status: StatusReserva
   criado_em: string
 }
@@ -254,8 +265,8 @@ export function criarProduto(input: ProdutoInput) {
     const id = Number(result.lastInsertRowid)
     if (quantidade > 0) {
       db.prepare(
-        'INSERT INTO movimentacoes (produto_id,tipo,quantidade,observacao,origem) VALUES (?,?,?,?,?)'
-      ).run(id, 'ENTRADA', quantidade, 'Estoque inicial', 'ESTOQUE_INICIAL')
+        'INSERT INTO movimentacoes (produto_id,tipo,quantidade,observacao,origem,usuario_id,usuario_nome) VALUES (?,?,?,?,?,?,?)'
+      ).run(id, 'ENTRADA', quantidade, 'Estoque inicial', 'ESTOQUE_INICIAL', ...autor())
     }
     return id
   })()
@@ -367,9 +378,9 @@ export function registrarEntrada(
     if (!produto) throw new Error('Material não encontrado')
     db.prepare('UPDATE produtos SET quantidade_atual=quantidade_atual+? WHERE id=?').run(quantidade, produtoId)
     db.prepare(`
-      INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao,origem)
-      VALUES (?,?,?,?,?,?)
-    `).run(produtoId, 'ENTRADA', quantidade, texto(input.responsavel), texto(input.observacao), origem)
+      INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao,origem,usuario_id,usuario_nome)
+      VALUES (?,?,?,?,?,?,?,?)
+    `).run(produtoId, 'ENTRADA', quantidade, texto(input.responsavel), texto(input.observacao), origem, ...autor())
   })()
 }
 
@@ -482,9 +493,9 @@ export function registrarBaixa(input: { produto_id: unknown; quantidade: unknown
     if (motivo === 'OUTRO' && !observacao) throw new Error('Descreva o motivo na observação')
     db.prepare('UPDATE produtos SET quantidade_atual=quantidade_atual-? WHERE id=?').run(quantidade, produto.id)
     db.prepare(`
-      INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao,origem,motivo)
-      VALUES (?,?,?,?,?,?,?)
-    `).run(produto.id, 'SAIDA', quantidade, texto(input.responsavel), observacao, 'BAIXA', motivo)
+      INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao,origem,motivo,usuario_id,usuario_nome)
+      VALUES (?,?,?,?,?,?,?,?,?)
+    `).run(produto.id, 'SAIDA', quantidade, texto(input.responsavel), observacao, 'BAIXA', motivo, ...autor())
   })()
 }
 
@@ -502,9 +513,9 @@ export function ajustarEstoque(input: { produto_id: unknown; quantidade_contada:
     if (diferenca === 0) throw new Error('A quantidade contada é igual ao estoque atual')
     db.prepare('UPDATE produtos SET quantidade_atual=? WHERE id=?').run(contada, produto.id)
     db.prepare(`
-      INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao,origem,motivo)
-      VALUES (?,?,?,?,?,?,?)
-    `).run(produto.id, diferenca > 0 ? 'ENTRADA' : 'SAIDA', Math.abs(diferenca), texto(input.responsavel), texto(input.observacao), 'AJUSTE', 'INVENTARIO')
+      INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao,origem,motivo,usuario_id,usuario_nome)
+      VALUES (?,?,?,?,?,?,?,?,?)
+    `).run(produto.id, diferenca > 0 ? 'ENTRADA' : 'SAIDA', Math.abs(diferenca), texto(input.responsavel), texto(input.observacao), 'AJUSTE', 'INVENTARIO', ...autor())
     return diferenca
   })()
 }
@@ -554,13 +565,13 @@ export function criarRequisicao(input: RequisicaoInput) {
 
     const numero = proximoNumero('REQ', 'requisicoes')
     const req = db.prepare(
-      'INSERT INTO requisicoes (numero,retirado_por,setor,finalidade,entregue_por,observacao) VALUES (?,?,?,?,?,?)'
-    ).run(numero, nome, texto(input.setor), finalidade, texto(input.entregue_por), texto(input.observacao))
+      'INSERT INTO requisicoes (numero,retirado_por,setor,finalidade,entregue_por,observacao,usuario_nome) VALUES (?,?,?,?,?,?,?)'
+    ).run(numero, nome, texto(input.setor), finalidade, texto(input.entregue_por), texto(input.observacao), autor()[1])
     const requisicaoId = Number(req.lastInsertRowid)
 
     const baixa = db.prepare('UPDATE produtos SET quantidade_atual=quantidade_atual-? WHERE id=?')
     const item = db.prepare('INSERT INTO requisicao_itens (requisicao_id,produto_id,quantidade,unidade,produto_nome) VALUES (?,?,?,?,?)')
-    const mov = db.prepare('INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao,requisicao_id,origem) VALUES (?,?,?,?,?,?,?)')
+    const mov = db.prepare('INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao,requisicao_id,origem,usuario_id,usuario_nome) VALUES (?,?,?,?,?,?,?,?,?)')
 
     for (const entrada of itens) {
       const produto = disponibilidade(entrada.produto_id)
@@ -570,7 +581,7 @@ export function criarRequisicao(input: RequisicaoInput) {
       }
       baixa.run(entrada.quantidade, produto.id)
       item.run(requisicaoId, produto.id, entrada.quantidade, produto.unidade, produto.nome)
-      mov.run(produto.id, 'SAIDA', entrada.quantidade, nome, `Requisição ${numero}${finalidade ? ' - ' + finalidade : ''}`, requisicaoId, 'REQUISICAO')
+      mov.run(produto.id, 'SAIDA', entrada.quantidade, nome, `Requisição ${numero}${finalidade ? ' - ' + finalidade : ''}`, requisicaoId, 'REQUISICAO', ...autor())
     }
     return requisicaoId
   })()
@@ -586,10 +597,10 @@ export function estornarRequisicao(id: number, motivo: unknown) {
     if (!req) throw new Error('Retirada não encontrada ou já estornada')
     const itens = db.prepare('SELECT * FROM requisicao_itens WHERE requisicao_id=?').all(id) as ItemDocumento[]
     const devolve = db.prepare('UPDATE produtos SET quantidade_atual=quantidade_atual+? WHERE id=?')
-    const mov = db.prepare('INSERT INTO movimentacoes (produto_id,tipo,quantidade,observacao,requisicao_id,origem,motivo) VALUES (?,?,?,?,?,?,?)')
+    const mov = db.prepare('INSERT INTO movimentacoes (produto_id,tipo,quantidade,observacao,requisicao_id,origem,motivo,usuario_id,usuario_nome) VALUES (?,?,?,?,?,?,?,?,?)')
     for (const i of itens) {
       devolve.run(i.quantidade, i.produto_id)
-      mov.run(i.produto_id, 'ENTRADA', i.quantidade, `Estorno da ${req.numero}: ${justificativa}`, id, 'ESTORNO', null)
+      mov.run(i.produto_id, 'ENTRADA', i.quantidade, `Estorno da ${req.numero}: ${justificativa}`, id, 'ESTORNO', null, ...autor())
     }
     db.prepare("UPDATE requisicoes SET status='CANCELADA', cancelada_em=CURRENT_TIMESTAMP, motivo_cancelamento=? WHERE id=?").run(justificativa, id)
   })()
@@ -633,8 +644,8 @@ export function criarReserva(input: ReservaInput) {
 
     const numero = proximoNumero('RES', 'reservas')
     const reserva = db.prepare(
-      'INSERT INTO reservas (numero,finalidade,reservado_por,observacao) VALUES (?,?,?,?)'
-    ).run(numero, finalidade, texto(input.reservado_por), texto(input.observacao))
+      'INSERT INTO reservas (numero,finalidade,reservado_por,observacao,usuario_nome) VALUES (?,?,?,?,?)'
+    ).run(numero, finalidade, texto(input.reservado_por), texto(input.observacao), autor()[1])
     const reservaId = Number(reserva.lastInsertRowid)
 
     const item = db.prepare('INSERT INTO reserva_itens (reserva_id,produto_id,quantidade,unidade,produto_nome) VALUES (?,?,?,?,?)')
@@ -705,21 +716,21 @@ export function retirarReserva(id: number, retiradoPor: unknown) {
 
     const numeroReq = proximoNumero('REQ', 'requisicoes')
     const req = db.prepare(
-      'INSERT INTO requisicoes (numero,retirado_por,finalidade,observacao,reserva_id) VALUES (?,?,?,?,?)'
-    ).run(numeroReq, nome, reserva.finalidade, reserva.observacao, id)
+      'INSERT INTO requisicoes (numero,retirado_por,finalidade,observacao,reserva_id,usuario_nome) VALUES (?,?,?,?,?,?)'
+    ).run(numeroReq, nome, reserva.finalidade, reserva.observacao, id, autor()[1])
     const reqId = Number(req.lastInsertRowid)
 
     const estoque = db.prepare('SELECT quantidade_atual FROM produtos WHERE id=?')
     const baixa = db.prepare('UPDATE produtos SET quantidade_atual=quantidade_atual-? WHERE id=?')
     const item = db.prepare('INSERT INTO requisicao_itens (requisicao_id,produto_id,quantidade,unidade,produto_nome) VALUES (?,?,?,?,?)')
-    const mov = db.prepare('INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao,requisicao_id,origem) VALUES (?,?,?,?,?,?,?)')
+    const mov = db.prepare('INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao,requisicao_id,origem,usuario_id,usuario_nome) VALUES (?,?,?,?,?,?,?,?,?)')
 
     for (const i of itens) {
       const p = estoque.get(i.produto_id) as { quantidade_atual: number } | undefined
       if (!p || p.quantidade_atual < i.quantidade) throw new Error(`Estoque insuficiente para ${i.produto_nome}`)
       baixa.run(i.quantidade, i.produto_id)
       item.run(reqId, i.produto_id, i.quantidade, i.unidade, i.produto_nome)
-      mov.run(i.produto_id, 'SAIDA', i.quantidade, nome, `Retirada da reserva ${reserva.numero} - Requisição ${numeroReq}`, reqId, 'RESERVA')
+      mov.run(i.produto_id, 'SAIDA', i.quantidade, nome, `Retirada da reserva ${reserva.numero} - Requisição ${numeroReq}`, reqId, 'RESERVA', ...autor())
     }
 
     db.prepare("UPDATE reservas SET status='RETIRADO' WHERE id=?").run(id)
