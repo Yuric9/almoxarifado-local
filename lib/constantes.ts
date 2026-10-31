@@ -19,6 +19,8 @@ export const ORIGENS: Record<string, string> = {
   BAIXA: 'Baixa',
   AJUSTE: 'Ajuste de inventário',
   ESTORNO: 'Estorno de retirada',
+  EMPRESTIMO: 'Empréstimo',
+  DEVOLUCAO: 'Devolução de empréstimo',
   IMPORTACAO: 'Entrada por documento',
   MANUAL: 'Manual'
 }

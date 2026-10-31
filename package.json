@@ -1,6 +1,6 @@
 {
   "name": "almoxarifado-local",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "private": true,
   "description": "Controle de almoxarifado offline e portátil (Next.js + SQLite + Electron).",
   "author": "Yuri Cesar",

@@ -11,7 +11,7 @@ import { AvisoErro, Campo, ModalFormulario, classeInput, classeTextarea, useEnvi
 type Base = { aoFechar: () => void; aoConcluir: (mensagem: string) => void | Promise<void> }
 
 /** Funcionários e setores cadastrados, para a retirada. */
-function usePessoas() {
+export function usePessoas() {
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([])
   const [setores, setSetores] = useState<Setor[]>([])
   useEffect(() => {

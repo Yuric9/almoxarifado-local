@@ -163,6 +163,37 @@ function migrar(db: DB) {
     db.exec("UPDATE produtos SET epi=1 WHERE categoria_id IN (SELECT id FROM categorias WHERE nome='EPI' COLLATE NOCASE)")
   }
 
+  // Empréstimo de ferramentas: sai do estoque e volta na devolução (o que não volta fica registrado como não devolvido).
+  db.exec(`
+  CREATE TABLE IF NOT EXISTS emprestimos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero TEXT NOT NULL UNIQUE,
+    retirado_por TEXT NOT NULL,
+    funcionario_id INTEGER REFERENCES funcionarios(id),
+    setor TEXT,
+    setor_id INTEGER REFERENCES setores(id),
+    previsao_devolucao TEXT,
+    observacao TEXT,
+    status TEXT NOT NULL DEFAULT 'ABERTO' CHECK (status IN ('ABERTO','DEVOLVIDO')),
+    usuario_nome TEXT,
+    criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    devolvido_em TEXT
+  );
+  CREATE TABLE IF NOT EXISTS emprestimo_itens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    emprestimo_id INTEGER NOT NULL REFERENCES emprestimos(id) ON DELETE CASCADE,
+    produto_id INTEGER NOT NULL REFERENCES produtos(id),
+    produto_nome TEXT NOT NULL,
+    unidade TEXT NOT NULL,
+    quantidade REAL NOT NULL CHECK (quantidade > 0),
+    devolvida REAL NOT NULL DEFAULT 0,
+    nao_devolvida REAL NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS idx_emprestimos_status ON emprestimos(status);
+  CREATE INDEX IF NOT EXISTS idx_emprestimo_itens_emprestimo ON emprestimo_itens(emprestimo_id);
+  `)
+  adicionarColunaSeFaltar(db, 'movimentacoes', 'emprestimo_id', 'INTEGER REFERENCES emprestimos(id)')
+
   db.exec(`
   CREATE TABLE IF NOT EXISTS configuracoes (
     chave TEXT PRIMARY KEY,

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowDownToLine, BarChart3, Boxes, CircleAlert, CircleCheck, ClipboardList, DatabaseBackup, History,
-  LayoutDashboard, LogOut, PackageCheck, PackageMinus, Plus, Settings, UsersRound, Warehouse
+  LayoutDashboard, LogOut, PackageCheck, PackageMinus, Plus, Settings, UsersRound, Warehouse, Wrench
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { api, mensagemErro } from '@/lib/cliente'
@@ -18,6 +18,7 @@ import { BaixaModal, FichaMaterial, MaterialFormModal } from '@/components/Mater
 import { ClassificarModal } from '@/components/Classificar'
 import { ImportarDocumentoModal } from '@/components/ImportarDocumento'
 import { PlanilhasModal } from '@/components/Planilhas'
+import { TelaEmprestimos } from '@/components/Emprestimos'
 import { TelaPessoas } from '@/components/Pessoas'
 import { TelaRelatorios } from '@/components/Relatorios'
 import { ReservaDetalhe } from '@/components/ReservaDetalhe'
@@ -26,7 +27,7 @@ import { Botao } from '@/components/ui'
 import { TelaAcesso, type SituacaoAcesso } from '@/components/Acesso'
 import { UsuarioContexto } from '@/components/Perfil'
 
-type Tela = 'painel' | 'materiais' | 'retiradas' | 'reservas' | 'movimentacoes' | 'pessoas' | 'relatorios' | 'backup' | 'configuracoes'
+type Tela = 'painel' | 'materiais' | 'retiradas' | 'reservas' | 'emprestimos' | 'movimentacoes' | 'pessoas' | 'relatorios' | 'backup' | 'configuracoes'
 type Janela = 'entrada' | 'novo' | 'requisicao' | 'reserva' | 'baixa' | 'planilhas' | 'documento' | 'classificar' | null
 type Aviso = { texto: string; erro?: boolean }
 
@@ -35,6 +36,7 @@ const MENU: Array<{ id: Tela; rotulo: string; icone: LucideIcon }> = [
   { id: 'materiais', rotulo: 'Materiais', icone: Boxes },
   { id: 'retiradas', rotulo: 'Retiradas', icone: ClipboardList },
   { id: 'reservas', rotulo: 'Reservas', icone: PackageCheck },
+  { id: 'emprestimos', rotulo: 'Empréstimos', icone: Wrench },
   { id: 'movimentacoes', rotulo: 'Movimentações', icone: History },
   { id: 'pessoas', rotulo: 'Pessoas e setores', icone: UsersRound },
   { id: 'relatorios', rotulo: 'Relatórios', icone: BarChart3 }
@@ -288,6 +290,7 @@ function Aplicacao({ usuario, sistemaInicial, aoSair }: { usuario: Usuario; sist
             )}
             {tela === 'retiradas' && <TelaRetiradas requisicoes={requisicoes} aoNova={() => setJanela('requisicao')} aoComprovante={abrirComprovante} />}
             {tela === 'reservas' && <TelaReservas reservas={reservas} aoNova={() => setJanela('reserva')} abrirReserva={setReservaAberta} />}
+            {tela === 'emprestimos' && <TelaEmprestimos produtos={produtos} empresa={config.empresa_nome} notificar={notificar} aoAlterarEstoque={recarregar} />}
             {tela === 'movimentacoes' && <TelaMovimentacoes filtroHoje={filtroHoje} versao={versao} abrirMaterial={setMaterialAberto} abrirComprovante={abrirComprovante} />}
             {tela === 'pessoas' && <TelaPessoas notificar={notificar} empresa={config.empresa_nome} />}
             {tela === 'relatorios' && <TelaRelatorios empresa={config.empresa_nome} produtos={produtos} categorias={categorias} />}
