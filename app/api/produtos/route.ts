@@ -33,7 +33,11 @@ export async function POST(req: Request) {
       minimo: body.minimo,
       unidade: body.unidade,
       codigo: body.codigo,
-      localizacao: body.localizacao
+      localizacao: body.localizacao,
+      epi: body.epi,
+      ca: body.ca,
+      ca_validade: body.ca_validade,
+      troca_dias: body.troca_dias
     })
     return ok({ ok: true, id }, 201)
   } catch (e) {

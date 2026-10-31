@@ -1,20 +1,22 @@
 'use client'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Building2, HardHat, Pencil, Plus, Power, Search } from 'lucide-react'
+import { Building2, HardHat, Pencil, Plus, Power, Search, ShieldCheck } from 'lucide-react'
 import { api, mensagemErro } from '@/lib/cliente'
 import type { Funcionario, Setor } from '@/lib/tipos'
+import { FichaEpiModal } from './FichaEpi'
 import { usePode } from './Perfil'
 import { AvisoErro, Badge, Botao, CabecalhoPagina, Campo, ModalFormulario, Painel, Tabela, celula, celulaNumero, classeCampo, classeInput, useEnvio } from './ui'
 
 type Notificar = (msg: string, erro?: boolean) => void
 
 /** Cadastro de setores/obras (destino do material) e de funcionários (quem retira). */
-export function TelaPessoas({ notificar }: { notificar: Notificar }) {
+export function TelaPessoas({ notificar, empresa }: { notificar: Notificar; empresa?: string }) {
   const podeOperar = usePode('operacao')
   const [setores, setSetores] = useState<Setor[]>([])
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([])
   const [editandoSetor, setEditandoSetor] = useState<Setor | 'novo' | null>(null)
   const [editandoFunc, setEditandoFunc] = useState<Funcionario | 'novo' | null>(null)
+  const [fichaEpi, setFichaEpi] = useState<number | null>(null)
   const [busca, setBusca] = useState('')
   const [inativos, setInativos] = useState(false)
 
@@ -61,7 +63,7 @@ export function TelaPessoas({ notificar }: { notificar: Notificar }) {
               <input type="checkbox" checked={inativos} onChange={e => setInativos(e.target.checked)} className="h-4 w-4 rounded border-slate-300" /> Mostrar desativados
             </label>
           </div>
-          <Tabela colunas={[{ titulo: 'Nome' }, { titulo: 'Matrícula' }, { titulo: 'Função' }, { titulo: 'Setor / obra' }, { titulo: 'Retiradas', alinhar: 'direita' }, { titulo: '', largura: 'w-20' }]}
+          <Tabela colunas={[{ titulo: 'Nome' }, { titulo: 'Matrícula' }, { titulo: 'Função' }, { titulo: 'Setor / obra' }, { titulo: 'Retiradas', alinhar: 'direita' }, { titulo: '', largura: 'w-28' }]}
             vazio={funcionarios.length ? 'Nenhum funcionário encontrado.' : 'Nenhum funcionário cadastrado. Use "Novo funcionário".'}>
             {lista.map(f => (
               <tr key={f.id} className={f.ativo ? '' : 'opacity-50'}>
@@ -71,12 +73,15 @@ export function TelaPessoas({ notificar }: { notificar: Notificar }) {
                 <td className={`${celula} text-slate-600`}>{f.setor || '—'}</td>
                 <td className={`${celulaNumero} text-slate-500`}>{f.total_retiradas}</td>
                 <td className={`${celula} text-right`}>
+                  <div className="flex justify-end gap-1">
+                    <button aria-label={`Ficha de EPI de ${f.nome}`} title="Ficha de EPI" onClick={() => setFichaEpi(f.id)} className="rounded p-1.5 text-emerald-700 hover:bg-emerald-50"><ShieldCheck size={16} /></button>
                   {podeOperar && (
-                    <div className="flex justify-end gap-1">
+                    <>
                       <button aria-label={`Editar ${f.nome}`} title="Editar" onClick={() => setEditandoFunc(f)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"><Pencil size={16} /></button>
                       <button aria-label={f.ativo ? `Desativar ${f.nome}` : `Reativar ${f.nome}`} title={f.ativo ? 'Desativar' : 'Reativar'} onClick={() => alternar(`/api/funcionarios/${f.id}`, f.ativo, f.nome)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"><Power size={16} /></button>
-                    </div>
+                    </>
                   )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -114,6 +119,7 @@ export function TelaPessoas({ notificar }: { notificar: Notificar }) {
         </Painel>
       </div>
 
+      {fichaEpi && <FichaEpiModal funcionarioId={fichaEpi} empresa={empresa} aoFechar={() => setFichaEpi(null)} />}
       {editandoSetor && <SetorModal setor={editandoSetor === 'novo' ? null : editandoSetor} aoFechar={() => setEditandoSetor(null)} aoConcluir={concluir} />}
       {editandoFunc && <FuncionarioModal funcionario={editandoFunc === 'novo' ? null : editandoFunc} setores={setores.filter(s => s.ativo)} aoFechar={() => setEditandoFunc(null)} aoConcluir={concluir} />}
     </>

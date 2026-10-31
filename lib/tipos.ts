@@ -3,11 +3,12 @@ export type { Categoria, Produto, Movimentacao, Requisicao, Reserva, ItemDocumen
 export type { Configuracoes, Tema } from './configuracoes'
 export type { Relatorio, LinhaEstoque, GrupoConsumo } from './relatorios'
 export type { Setor, Funcionario } from './pessoas'
+export type { FichaEpi, EpiEmUso, EntregaEpi } from './epi'
 export type { ResultadoImportacao } from './planilha'
 export type { DocumentoLido } from './documento'
 export type { Usuario } from './auth'
 export type { ItemClassificacao, Sugestao as SugestaoCategoria } from './classificacao'
-export { UNIDADES, MOTIVOS_BAIXA, ORIGENS, PERFIS, descreverOrigem, type MotivoBaixa, type Perfil } from './constantes'
+export { UNIDADES, MOTIVOS_BAIXA, ORIGENS, PERFIS, descreverOrigem, situacaoCa, dataBr, type MotivoBaixa, type Perfil } from './constantes'
 import type { Categoria, ItemDocumento, Movimentacao, Produto, Requisicao, Reserva, StatusReserva } from './repository'
 
 export type CategoriaResumo = Categoria & { total_materiais: number }

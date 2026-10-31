@@ -50,3 +50,15 @@ export const PERFIS = {
   CONSULTA: 'Consulta'
 } as const
 export type Perfil = keyof typeof PERFIS
+
+/** Situação do CA (Certificado de Aprovação) de um EPI: vencido, vencendo em até 30 dias ou em dia (null). */
+export function situacaoCa(p: { epi: number; ca_validade: string | null }, hoje = new Date()): 'VENCIDO' | 'VENCE_EM_BREVE' | null {
+  if (!p.epi || !p.ca_validade) return null
+  const d = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+  if (p.ca_validade < d(hoje)) return 'VENCIDO'
+  const limite = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 30)
+  return p.ca_validade <= d(limite) ? 'VENCE_EM_BREVE' : null
+}
+
+/** "2027-05-01" → "01/05/2027". */
+export const dataBr = (iso: string | null | undefined) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '')

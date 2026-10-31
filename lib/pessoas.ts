@@ -87,8 +87,18 @@ export function criarFuncionario(input: { nome: unknown; matricula?: unknown; fu
   if (!nome) throw new Error('Informe o nome do funcionário')
   const matricula = texto(input.matricula)
   matriculaLivre(matricula)
-  return Number(getDb().prepare('INSERT INTO funcionarios (nome, matricula, funcao, setor_id) VALUES (?,?,?,?)')
-    .run(nome, matricula, texto(input.funcao), setorValido(input.setor_id)).lastInsertRowid)
+  const db = getDb()
+  return db.transaction(() => {
+    const id = Number(db.prepare('INSERT INTO funcionarios (nome, matricula, funcao, setor_id) VALUES (?,?,?,?)')
+      .run(nome, matricula, texto(input.funcao), setorValido(input.setor_id)).lastInsertRowid)
+    // Retiradas antigas com exatamente esse nome passam a ser dele (entram no consumo e na ficha de EPI).
+    // Se já existir outro funcionário com o mesmo nome, não dá para saber de quem eram: fica como está.
+    const homonimos = (db.prepare('SELECT COUNT(*) AS n FROM funcionarios WHERE nome=? COLLATE NOCASE').get(nome) as { n: number }).n
+    if (homonimos === 1) {
+      db.prepare('UPDATE requisicoes SET funcionario_id=? WHERE funcionario_id IS NULL AND TRIM(retirado_por)=? COLLATE NOCASE').run(id, nome)
+    }
+    return id
+  })()
 }
 
 export function atualizarFuncionario(id: number, input: { nome?: unknown; matricula?: unknown; funcao?: unknown; setor_id?: unknown; ativo?: unknown }) {

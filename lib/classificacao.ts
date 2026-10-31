@@ -399,6 +399,10 @@ export function aplicarClassificacao(input: { itens: unknown }) {
       const categoriaId = nomeCategoria ? obterOuCriarCategoria(nomeCategoria) : atual.categoria_id
       const unidade = typeof item.unidade === 'string' && item.unidade.trim() ? item.unidade.trim().toUpperCase() : atual.unidade
       db.prepare('UPDATE produtos SET categoria_id=?, unidade=? WHERE id=?').run(categoriaId, unidade, id)
+      // Classificado agora como EPI: passa a ir para a ficha de EPI de quem retirar.
+      if (categoriaId !== atual.categoria_id) {
+        db.prepare("UPDATE produtos SET epi=1 WHERE id=? AND categoria_id IN (SELECT id FROM categorias WHERE nome='EPI' COLLATE NOCASE)").run(id)
+      }
       atualizados++
     }
     const criadas = (db.prepare('SELECT COUNT(*) AS total FROM categorias').get() as { total: number }).total - antes

@@ -1,8 +1,8 @@
 'use client'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { ArrowDownToLine, ClipboardCheck, PackageMinus, Pencil, Plus, Power, Tags, Trash2 } from 'lucide-react'
+import { ArrowDownToLine, ClipboardCheck, PackageMinus, Pencil, Plus, Power, ShieldCheck, Tags, Trash2 } from 'lucide-react'
 import { api, formatarData, formatarQtd, mensagemErro } from '@/lib/cliente'
-import { MOTIVOS_BAIXA, UNIDADES, descreverOrigem, type CategoriaResumo, type Produto, type ProdutoFicha, type SugestaoCategoria } from '@/lib/tipos'
+import { MOTIVOS_BAIXA, UNIDADES, dataBr, descreverOrigem, situacaoCa, type CategoriaResumo, type Produto, type ProdutoFicha, type SugestaoCategoria } from '@/lib/tipos'
 import { EntradaModal } from './Formularios'
 import { SeletorMaterial } from './SeletorMaterial'
 import { AvisoErro, Badge, Botao, Campo, Modal, ModalFormulario, Tabela, celula, celulaNumero, classeInput, useEnvio } from './ui'
@@ -27,12 +27,21 @@ export function MaterialFormModal({ produto, categorias, aoFechar, aoConcluir, a
     unidade: produto?.unidade || 'UN',
     localizacao: produto?.localizacao || '',
     quantidade: '',
-    minimo: produto ? String(produto.estoque_minimo) : ''
+    minimo: produto ? String(produto.estoque_minimo) : '',
+    epi: !!produto?.epi,
+    ca: produto?.ca || '',
+    ca_validade: produto?.ca_validade || '',
+    troca_dias: produto?.troca_dias ? String(produto.troca_dias) : ''
   })
   const [novaCategoria, setNovaCategoria] = useState<string | null>(null)
   const [sugestao, setSugestao] = useState<SugestaoCategoria | null>(null)
   const { enviando, erro, setErro, executar } = useEnvio()
   const campo = (nome: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [nome]: e.target.value })
+  // Escolheu a categoria EPI: já marca como EPI (dá para desmarcar).
+  const mudarCategoria = (e: { target: { value: string } }) => {
+    const ehEpi = categorias.find(c => String(c.id) === e.target.value)?.nome.toUpperCase() === 'EPI'
+    setForm(f => ({ ...f, categoria_id: e.target.value, epi: ehEpi || f.epi }))
+  }
   const unidades = UNIDADES.includes(form.unidade as (typeof UNIDADES)[number]) ? UNIDADES : [form.unidade, ...UNIDADES]
 
   // Sugere a categoria pelo nome enquanto o material está sem categoria.
@@ -55,7 +64,7 @@ export function MaterialFormModal({ produto, categorias, aoFechar, aoConcluir, a
         id = (await api<{ id: number }>('/api/categorias', { method: 'POST', json: { nome: s.categoria } })).id
         await aoCriarCategoria()
       }
-      setForm(f => ({ ...f, categoria_id: String(id) }))
+      setForm(f => ({ ...f, categoria_id: String(id), epi: f.epi || s.categoria.toUpperCase() === 'EPI' }))
     } catch (e) {
       setErro(mensagemErro(e))
     }
@@ -81,7 +90,11 @@ export function MaterialFormModal({ produto, categorias, aoFechar, aoConcluir, a
         categoria_id: form.categoria_id ? Number(form.categoria_id) : null,
         unidade: form.unidade,
         localizacao: form.localizacao,
-        minimo: form.minimo === '' ? undefined : Number(form.minimo)
+        minimo: form.minimo === '' ? undefined : Number(form.minimo),
+        epi: form.epi,
+        ca: form.ca,
+        ca_validade: form.ca_validade,
+        troca_dias: form.troca_dias === '' ? null : Number(form.troca_dias)
       }
       if (editando) {
         await api(`/api/produtos/${produto.id}`, { method: 'PATCH', json: dados })
@@ -106,7 +119,7 @@ export function MaterialFormModal({ produto, categorias, aoFechar, aoConcluir, a
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Campo rotulo="Categoria">
-            <select value={form.categoria_id} onChange={campo('categoria_id')} className={classeInput}>
+            <select value={form.categoria_id} onChange={mudarCategoria} className={classeInput}>
               <option value="">Sem categoria</option>
               {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
             </select>
@@ -146,6 +159,22 @@ export function MaterialFormModal({ produto, categorias, aoFechar, aoConcluir, a
           <input value={form.localizacao} onChange={campo('localizacao')} className={classeInput} placeholder="Ex.: Corredor 2, prateleira B" />
         </Campo>
       </div>
+      <fieldset className="rounded-md border border-slate-200 px-3 py-2">
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-800">
+          <input type="checkbox" checked={form.epi} onChange={e => setForm({ ...form, epi: e.target.checked })} className="h-4 w-4 rounded border-slate-300" />
+          <ShieldCheck size={16} className="text-emerald-700" /> É EPI (equipamento de proteção individual)
+        </label>
+        {form.epi && (
+          <>
+            <div className="mt-2 grid grid-cols-3 gap-3">
+              <Campo rotulo="Nº do CA" opcional><input value={form.ca} onChange={campo('ca')} className={classeInput} placeholder="Ex.: 12345" inputMode="numeric" /></Campo>
+              <Campo rotulo="Validade do CA" opcional><input type="date" value={form.ca_validade} onChange={campo('ca_validade')} className={classeInput} /></Campo>
+              <Campo rotulo="Trocar a cada (dias)" opcional><input type="number" min="1" step="1" value={form.troca_dias} onChange={campo('troca_dias')} className={classeInput} placeholder="Ex.: 90" /></Campo>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">Cada retirada deste material vai para a <b>ficha de EPI</b> do funcionário, com o CA da data da entrega.</p>
+          </>
+        )}
+      </fieldset>
       {editando && <p className="text-xs text-slate-500">A quantidade em estoque não é alterada aqui. Use “Ajustar estoque” para corrigir o saldo.</p>}
       <AvisoErro texto={erro} />
     </ModalFormulario>
@@ -298,7 +327,7 @@ export function FichaMaterial({ produtoId, produtos, categorias, aoFechar, aoAlt
 
   return (
     <>
-      <Modal titulo={ficha?.nome || 'Material'} descricao={ficha ? [ficha.codigo, ficha.categoria || 'Sem categoria', ficha.localizacao].filter(Boolean).join(' · ') : undefined} aoFechar={aoFechar} largura="max-w-4xl">
+      <Modal titulo={ficha?.nome || 'Material'} descricao={ficha ? [ficha.codigo, ficha.categoria || 'Sem categoria', ficha.localizacao, ficha.epi ? `EPI${ficha.ca ? ` · CA ${ficha.ca}` : ''}${ficha.ca_validade ? ` (validade ${dataBr(ficha.ca_validade)}${situacaoCa(ficha) === 'VENCIDO' ? ', VENCIDO' : ''})` : ''}` : ''].filter(Boolean).join(' · ') : undefined} aoFechar={aoFechar} largura="max-w-4xl">
         {!ficha ? <p className="py-6 text-center text-sm text-slate-500">{erro || 'Carregando…'}</p> : (
           <div className="space-y-5">
             {!ficha.ativo && <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">Material inativo: não aparece nas listas de entrada, retirada e reserva.</p>}
