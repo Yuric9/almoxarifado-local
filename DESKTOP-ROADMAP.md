@@ -36,7 +36,7 @@
 - [x] Ficha de EPI por funcionário (NR-6, com CA)
 - [x] Empréstimo de ferramentas (sai e volta)
 - [ ] Estoque máximo e lista de reposição
-- [ ] Inventário completo (folha de contagem e divergências)
+- [x] Inventário completo (folha de contagem e divergências)
 - [ ] Cadastro de fornecedores e pedidos de compra
 - [ ] Migrar para Next.js 15 (alertas de segurança do Next 14 em recursos não usados pelo app)
 
