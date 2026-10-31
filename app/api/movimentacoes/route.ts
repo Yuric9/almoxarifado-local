@@ -1,6 +1,7 @@
 import { falha, lerJson, ok } from '@/lib/api'
 import { listarMovimentacoes, registrarEntrada } from '@/lib/repository'
 import { diaSeguinte, limiteUtc } from '@/lib/relatorios'
+import { exigir } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -10,6 +11,7 @@ const DATA = /^\d{4}-\d{2}-\d{2}$/
 /** Filtros opcionais: ?inicio=AAAA-MM-DD&fim=AAAA-MM-DD&tipo=ENTRADA|SAIDA&produto_id=1&limite=500 */
 export function GET(req: Request) {
   try {
+    exigir('leitura')
     const q = new URL(req.url).searchParams
     const inicio = q.get('inicio')
     const fim = q.get('fim')
@@ -29,6 +31,7 @@ export function GET(req: Request) {
 /** Apenas entradas. Saídas são registradas por requisição ou retirada de reserva. */
 export async function POST(req: Request) {
   try {
+    exigir('operacao')
     const body = await lerJson(req)
     if (body.tipo && body.tipo !== 'ENTRADA') {
       throw new Error('Saídas devem ser registradas por uma requisição de retirada')

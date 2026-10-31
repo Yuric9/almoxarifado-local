@@ -31,7 +31,12 @@
 - [x] Importar o XML da NF-e (mais preciso que o PDF)
 - [x] Classificação automática de materiais pela tabela GOINFRA/AGETOP
 - [ ] Atualizar a tabela de referência importando a planilha nova da GOINFRA ou do SINAPI
-- [ ] Usuários e permissões (login)
+- [x] Usuários e permissões (login, perfis Administrador/Almoxarife/Consulta, "registrado por")
+- [ ] Cadastro de setores/obras e funcionários (consumo por setor)
+- [ ] Ficha de EPI por funcionário (NR-6, com CA)
+- [ ] Empréstimo de ferramentas (sai e volta)
+- [ ] Estoque máximo e lista de reposição
+- [ ] Inventário completo (folha de contagem e divergências)
 - [ ] Cadastro de fornecedores e pedidos de compra
 - [ ] Migrar para Next.js 15 (alertas de segurança do Next 14 em recursos não usados pelo app)
 

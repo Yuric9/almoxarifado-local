@@ -1,5 +1,6 @@
 import { falha, idDaRota, lerJson, ok } from '@/lib/api'
 import { atualizarCategoria, excluirCategoria } from '@/lib/repository'
+import { exigir } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -8,6 +9,7 @@ type Contexto = { params: { id: string } }
 
 export async function PATCH(req: Request, { params }: Contexto) {
   try {
+    exigir('admin')
     const body = await lerJson(req)
     return ok({ ok: true, ...atualizarCategoria(idDaRota(params.id), { nome: body.nome, cor: body.cor, juntar: body.juntar }) })
   } catch (e) {
@@ -17,6 +19,7 @@ export async function PATCH(req: Request, { params }: Contexto) {
 
 export function DELETE(_req: Request, { params }: Contexto) {
   try {
+    exigir('admin')
     excluirCategoria(idDaRota(params.id))
     return ok({ ok: true })
   } catch (e) {

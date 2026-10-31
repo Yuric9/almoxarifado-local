@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Download, HardDrive, TriangleAlert, Upload } from 'lucide-react'
 import { api, mensagemErro } from '@/lib/cliente'
 import { Botao, CabecalhoPagina, Painel, Tabela, celula, celulaNumero } from './ui'
+import { usePode } from './Perfil'
 
 /* ------------------------------------------------------------------ backup */
 
@@ -11,6 +12,7 @@ type ListaBackups = { pasta: string; backups: Array<{ nome: string; tamanho: num
 const tamanho = (bytes: number) => bytes < 1024 * 1024 ? `${Math.ceil(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`
 
 export function TelaBackup({ aoRestaurar, notificar }: { aoRestaurar: () => void | Promise<void>; notificar: (msg: string, erro?: boolean) => void }) {
+  const admin = usePode('admin')
   const [lista, setLista] = useState<ListaBackups | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const arquivo = useRef<HTMLInputElement>(null)
@@ -81,7 +83,7 @@ export function TelaBackup({ aoRestaurar, notificar }: { aoRestaurar: () => void
           </Tabela>
         </Painel>
 
-        <Painel titulo="Restaurar backup">
+        {admin && <Painel titulo="Restaurar backup">
           <div className="mb-3 flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
             <TriangleAlert size={16} className="mt-0.5 shrink-0" />
             <p>Substitui todos os dados atuais. Antes, uma cópia dos dados atuais é salva automaticamente.</p>
@@ -91,7 +93,7 @@ export function TelaBackup({ aoRestaurar, notificar }: { aoRestaurar: () => void
             <Upload size={16} /> <span className="truncate">{nomeArquivo || 'Escolher arquivo .db'}</span>
           </label>
           <Botao className="mt-3 w-full" onClick={restaurar} disabled={ocupado || !nomeArquivo}>Restaurar</Botao>
-        </Painel>
+        </Painel>}
       </div>
     </>
   )

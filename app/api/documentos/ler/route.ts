@@ -1,5 +1,6 @@
 import { falha, ok } from '@/lib/api'
 import { lerDocumento } from '@/lib/documento'
+import { exigir } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -9,6 +10,7 @@ const LIMITE_BYTES = 30 * 1024 * 1024
 /** Lê um PDF, XML da NF-e, Word ou Excel e devolve os itens encontrados para conferência. Não grava nada. */
 export async function POST(req: Request) {
   try {
+    exigir('operacao')
     const form = await req.formData()
     const arquivo = form.get('arquivo')
     if (!(arquivo instanceof File) || arquivo.size === 0) throw new Error('Selecione um arquivo PDF, XML, Word ou Excel')

@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react'
 import { FileText, TriangleAlert, Upload } from 'lucide-react'
 import { api, formatarQtd } from '@/lib/cliente'
 import type { CategoriaResumo, DocumentoLido, Produto } from '@/lib/tipos'
+import { usePode } from './Perfil'
 import { SeletorMaterial } from './SeletorMaterial'
 import { AvisoErro, Badge, Botao, Campo, Modal, classeInput, useEnvio } from './ui'
 
@@ -41,6 +42,7 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
   aoFechar: () => void
   aoConcluir: (mensagem: string) => Promise<void>
 }) {
+  const admin = usePode('admin')
   const arquivo = useRef<HTMLInputElement>(null)
   const [nomeArquivo, setNomeArquivo] = useState('')
   const [doc, setDoc] = useState<DocumentoLido | null>(null)
@@ -246,7 +248,7 @@ export function ImportarDocumentoModal({ produtos, categorias, aoFechar, aoConcl
 
           <div className="-mx-5 -mb-4 flex flex-wrap items-center gap-4 border-t border-slate-200 bg-slate-50 px-5 py-3">
             <div className="flex flex-wrap gap-4 text-sm text-slate-700" role="radiogroup" aria-label="O que fazer">
-              {MODOS.map(m => (
+              {MODOS.filter(m => m.valor !== 'atualizar' || admin).map(m => (
                 <label key={m.valor} className="inline-flex items-center gap-2" title={m.ajuda}>
                   <input type="radio" name="modo" checked={modo === m.valor} onChange={() => setModo(m.valor)} /> {m.rotulo}
                 </label>

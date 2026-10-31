@@ -4,10 +4,12 @@ import { CircleCheck, Download, FileSpreadsheet, Upload } from 'lucide-react'
 import { api } from '@/lib/cliente'
 import type { ResultadoImportacao } from '@/lib/tipos'
 import { AvisoErro, Botao, Modal, useEnvio } from './ui'
+import { usePode } from './Perfil'
 
 const linkBotao = 'inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-superficie px-3 text-sm font-medium text-slate-700 hover:bg-slate-50'
 
 export function PlanilhasModal({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: (mensagem: string) => Promise<void> }) {
+  const admin = usePode('admin')
   const arquivo = useRef<HTMLInputElement>(null)
   const [nome, setNome] = useState('')
   const [ajustar, setAjustar] = useState(false)
@@ -52,10 +54,10 @@ export function PlanilhasModal({ aoFechar, aoImportar }: { aoFechar: () => void;
           <label htmlFor="arquivo-planilha" className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed border-slate-300 px-3 text-sm text-slate-600 hover:bg-slate-50">
             <Upload size={16} /> <span className="truncate">{nome || 'Escolher planilha (.xlsx ou .csv)'}</span>
           </label>
-          <label className="mt-3 flex items-start gap-2 text-sm text-slate-700">
+          {admin && <label className="mt-3 flex items-start gap-2 text-sm text-slate-700">
             <input type="checkbox" checked={ajustar} onChange={e => setAjustar(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300" />
             <span>Atualizar o estoque dos materiais existentes com a coluna Quantidade <span className="text-slate-500">(gera um ajuste de inventário para cada diferença)</span></span>
-          </label>
+          </label>}
           <div className="mt-3 flex justify-end">
             <Botao variante="primario" onClick={importar} disabled={enviando || !nome} icone={<Upload size={16} />}>{enviando ? 'Importando…' : 'Importar'}</Botao>
           </div>

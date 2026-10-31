@@ -106,6 +106,29 @@ function migrar(db: DB) {
   adicionarColunaSeFaltar(db, 'produtos', 'ativo', 'INTEGER NOT NULL DEFAULT 1')
   adicionarColunaSeFaltar(db, 'movimentacoes', 'motivo', 'TEXT')
 
+  // Usuários e sessões (login). As senhas ficam só como hash (scrypt), nunca em texto.
+  db.exec(`
+  CREATE TABLE IF NOT EXISTS usuarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    login TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    senha_hash TEXT NOT NULL,
+    perfil TEXT NOT NULL CHECK (perfil IN ('ADMIN','ALMOXARIFE','CONSULTA')),
+    ativo INTEGER NOT NULL DEFAULT 1,
+    criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS sessoes (
+    token_hash TEXT PRIMARY KEY,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    expira_em TEXT NOT NULL
+  );
+  `)
+  // Quem registrou cada movimentação, retirada e reserva (preenchido pelo login).
+  adicionarColunaSeFaltar(db, 'movimentacoes', 'usuario_id', 'INTEGER REFERENCES usuarios(id)')
+  adicionarColunaSeFaltar(db, 'movimentacoes', 'usuario_nome', 'TEXT')
+  adicionarColunaSeFaltar(db, 'requisicoes', 'usuario_nome', 'TEXT')
+  adicionarColunaSeFaltar(db, 'reservas', 'usuario_nome', 'TEXT')
+
   db.exec(`
   CREATE TABLE IF NOT EXISTS configuracoes (
     chave TEXT PRIMARY KEY,

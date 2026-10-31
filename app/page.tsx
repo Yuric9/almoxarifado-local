@@ -2,13 +2,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowDownToLine, BarChart3, Boxes, CircleAlert, CircleCheck, ClipboardList, DatabaseBackup, History,
-  LayoutDashboard, PackageCheck, PackageMinus, Plus, Settings, Warehouse
+  LayoutDashboard, LogOut, PackageCheck, PackageMinus, Plus, Settings, Warehouse
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { api, mensagemErro } from '@/lib/cliente'
 import type {
-  CategoriaResumo, Configuracoes, Movimentacao, Produto, RequisicaoDetalhe, RequisicaoResumo, ReservaDetalhe as Detalhe, ReservaResumo, Sistema
+  CategoriaResumo, Configuracoes, Movimentacao, Produto, RequisicaoDetalhe, RequisicaoResumo, ReservaDetalhe as Detalhe, ReservaResumo, Sistema, Usuario
 } from '@/lib/tipos'
+import { PERFIS } from '@/lib/tipos'
 import { TelaBackup } from '@/components/Backup'
 import { Comprovante } from '@/components/Comprovante'
 import { TelaConfiguracoes } from '@/components/Configuracoes'
@@ -21,6 +22,8 @@ import { TelaRelatorios } from '@/components/Relatorios'
 import { ReservaDetalhe } from '@/components/ReservaDetalhe'
 import { TelaMateriais, TelaMovimentacoes, TelaPainel, TelaReservas, TelaRetiradas, type Navegar } from '@/components/Telas'
 import { Botao } from '@/components/ui'
+import { TelaAcesso, type SituacaoAcesso } from '@/components/Acesso'
+import { UsuarioContexto } from '@/components/Perfil'
 
 type Tela = 'painel' | 'materiais' | 'retiradas' | 'reservas' | 'movimentacoes' | 'relatorios' | 'backup' | 'configuracoes'
 type Janela = 'entrada' | 'novo' | 'requisicao' | 'reserva' | 'baixa' | 'planilhas' | 'documento' | 'classificar' | null
@@ -54,13 +57,71 @@ function useTema(tema: Configuracoes['tema']) {
   }, [tema])
 }
 
+type EstadoAcesso = {
+  situacao: SituacaoAcesso
+  usuario: Usuario | null
+  administradores: Array<{ login: string; nome: string }>
+}
+
+/** Porta de entrada: primeiro acesso, recuperação de senha ou login; depois, o sistema. */
 export default function Home() {
+  const [acesso, setAcesso] = useState<EstadoAcesso | null>(null)
+  const [sistema, setSistema] = useState<Sistema | null>(null)
+  const [erro, setErro] = useState('')
+
+  const conferir = useCallback(async () => {
+    try {
+      setAcesso(await api<EstadoAcesso>('/api/auth'))
+      setErro('')
+    } catch (e) {
+      setErro(mensagemErro(e))
+    }
+  }, [])
+
+  useEffect(() => {
+    conferir()
+    api<Sistema>('/api/sistema').then(setSistema).catch(() => {})
+    const expirou = () => conferir()
+    window.addEventListener('sessao-expirada', expirou)
+    return () => window.removeEventListener('sessao-expirada', expirou)
+  }, [conferir])
+
+  useTemaSalvo()
+
+  async function sairDoSistema() {
+    await api('/api/auth', { method: 'POST', json: { acao: 'sair' } }).catch(() => {})
+    await conferir()
+  }
+
+  if (erro) return <p role="alert" className="p-6 text-sm text-red-700">Não foi possível iniciar: {erro}</p>
+  if (!acesso) return <p className="p-6 text-sm text-slate-500">Carregando…</p>
+  if (!acesso.usuario) {
+    return <TelaAcesso key={acesso.situacao} situacao={acesso.situacao} administradores={acesso.administradores} pastaDados={sistema?.pasta_dados} aoEntrar={conferir} />
+  }
+  return (
+    <UsuarioContexto.Provider value={acesso.usuario}>
+      <Aplicacao usuario={acesso.usuario} sistemaInicial={sistema} aoSair={sairDoSistema} />
+    </UsuarioContexto.Provider>
+  )
+}
+
+/** Antes do login ainda não há configurações: usa o tema guardado no navegador. */
+function useTemaSalvo() {
+  useEffect(() => {
+    let tema = 'sistema'
+    try { tema = localStorage.getItem('tema') || 'sistema' } catch { /* sem armazenamento */ }
+    const escuro = tema === 'escuro' || (tema === 'sistema' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    document.documentElement.classList.toggle('dark', escuro)
+  }, [])
+}
+
+function Aplicacao({ usuario, sistemaInicial, aoSair }: { usuario: Usuario; sistemaInicial: Sistema | null; aoSair: () => Promise<void> }) {
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [categorias, setCategorias] = useState<CategoriaResumo[]>([])
   const [movs, setMovs] = useState<Movimentacao[]>([])
   const [requisicoes, setRequisicoes] = useState<RequisicaoResumo[]>([])
   const [reservas, setReservas] = useState<ReservaResumo[]>([])
-  const [sistema, setSistema] = useState<Sistema | null>(null)
+  const [sistema, setSistema] = useState<Sistema | null>(sistemaInicial)
   const [config, setConfig] = useState<Configuracoes>(CONFIG_INICIAL)
   const [configCarregada, setConfigCarregada] = useState(false)
   const [carregando, setCarregando] = useState(true)
@@ -164,7 +225,8 @@ export default function Home() {
   }
 
   const reservasAbertas = reservas.filter(r => r.status === 'SEPARADO' || r.status === 'AGUARDANDO_RETIRADA').length
-  const acoesRapidas = (
+  const podeOperar = usuario.perfil !== 'CONSULTA'
+  const acoesRapidas = !podeOperar ? null : (
     <>
       <Botao onClick={() => setJanela('entrada')} icone={<ArrowDownToLine size={16} />}>Registrar entrada</Botao>
       <Botao onClick={() => setJanela('baixa')} icone={<PackageMinus size={16} />}>Dar baixa</Botao>
@@ -191,8 +253,18 @@ export default function Home() {
             ))}
           </nav>
           <div className="space-y-0.5 border-t border-[#1e293b] p-2">
-            <ItemMenu ativo={tela === 'backup'} onClick={() => irPara('backup')} icone={<DatabaseBackup size={18} />} rotulo="Backup" />
+            {podeOperar && <ItemMenu ativo={tela === 'backup'} onClick={() => irPara('backup')} icone={<DatabaseBackup size={18} />} rotulo="Backup" />}
             <ItemMenu ativo={tela === 'configuracoes'} onClick={() => irPara('configuracoes')} icone={<Settings size={18} />} rotulo="Configurações" />
+          </div>
+          <div className="flex items-center gap-2 border-t border-[#1e293b] px-3 py-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1e293b] text-xs font-semibold text-white">
+              {usuario.nome.split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate text-sm font-medium text-white" title={usuario.nome}>{usuario.nome}</p>
+              <p className="text-[11px] text-[#94a3b8]">{PERFIS[usuario.perfil]}</p>
+            </div>
+            <button type="button" onClick={aoSair} title="Sair" aria-label="Sair" className="rounded p-1.5 text-[#94a3b8] hover:bg-[#1e293b] hover:text-white"><LogOut size={16} /></button>
           </div>
         </aside>
 

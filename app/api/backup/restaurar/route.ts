@@ -1,5 +1,6 @@
 import { falha, ok } from '@/lib/api'
 import { restaurarBackup } from '@/lib/backup'
+import { exigir } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -8,6 +9,7 @@ const LIMITE_BYTES = 200 * 1024 * 1024
 
 export async function POST(req: Request) {
   try {
+    exigir('admin')
     const form = await req.formData()
     const arquivo = form.get('arquivo')
     if (!(arquivo instanceof Blob) || arquivo.size === 0) throw new Error('Selecione um arquivo de backup (.db)')

@@ -42,3 +42,11 @@ export function normalizarUnidade(valor: string | null | undefined) {
   if (!u) return null
   return UNIDADES_EQUIVALENTES[u] ?? u
 }
+
+/** Perfis de acesso. ADMIN faz tudo; ALMOXARIFE movimenta o estoque; CONSULTA só vê e tira relatórios. */
+export const PERFIS = {
+  ADMIN: 'Administrador',
+  ALMOXARIFE: 'Almoxarife',
+  CONSULTA: 'Consulta'
+} as const
+export type Perfil = keyof typeof PERFIS
