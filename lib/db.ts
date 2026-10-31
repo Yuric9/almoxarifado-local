@@ -152,6 +152,17 @@ function migrar(db: DB) {
   adicionarColunaSeFaltar(db, 'requisicoes', 'funcionario_id', 'INTEGER REFERENCES funcionarios(id)')
   vincularSetoresDoHistorico(db)
 
+  // EPI (NR-6): o material guarda o CA vigente; cada entrega guarda o CA da época.
+  const epiNovo = !colunaExiste(db, 'produtos', 'epi')
+  adicionarColunaSeFaltar(db, 'produtos', 'epi', 'INTEGER NOT NULL DEFAULT 0')
+  adicionarColunaSeFaltar(db, 'produtos', 'ca', 'TEXT')
+  adicionarColunaSeFaltar(db, 'produtos', 'ca_validade', 'TEXT')
+  adicionarColunaSeFaltar(db, 'produtos', 'troca_dias', 'INTEGER')
+  adicionarColunaSeFaltar(db, 'requisicao_itens', 'ca', 'TEXT')
+  if (epiNovo) {
+    db.exec("UPDATE produtos SET epi=1 WHERE categoria_id IN (SELECT id FROM categorias WHERE nome='EPI' COLLATE NOCASE)")
+  }
+
   db.exec(`
   CREATE TABLE IF NOT EXISTS configuracoes (
     chave TEXT PRIMARY KEY,

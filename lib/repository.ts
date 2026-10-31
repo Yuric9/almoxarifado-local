@@ -26,6 +26,11 @@ export type Produto = {
   localizacao: string | null
   ativo: number
   criado_em: string
+  /** 1 = equipamento de proteção individual: entrega vai para a ficha de EPI do funcionário. */
+  epi: number
+  ca: string | null
+  ca_validade: string | null
+  troca_dias: number | null
   categoria: string | null
   quantidade_reservada: number
   quantidade_disponivel: number
@@ -75,6 +80,8 @@ export type ItemDocumento = {
   quantidade: number
   unidade: string
   produto_nome: string
+  /** CA do EPI na data da entrega (só itens de EPI). */
+  ca?: string | null
 }
 
 export type StatusReserva = 'SEPARADO' | 'AGUARDANDO_RETIRADA' | 'RETIRADO' | 'CANCELADO'
@@ -216,6 +223,27 @@ export type ProdutoInput = {
   unidade?: unknown
   codigo?: unknown
   localizacao?: unknown
+  epi?: unknown
+  ca?: unknown
+  ca_validade?: unknown
+  troca_dias?: unknown
+}
+
+/** Campos de EPI. Material que não é EPI não guarda CA nem prazo de troca. */
+function dadosEpi(input: ProdutoInput, atual?: Pick<Produto, 'epi' | 'ca' | 'ca_validade' | 'troca_dias'>, categoriaId?: number | null) {
+  let epi: boolean
+  if (input.epi !== undefined) epi = !!input.epi
+  else if (atual) epi = !!atual.epi
+  else epi = !!categoriaId && !!getDb().prepare("SELECT 1 FROM categorias WHERE id=? AND nome='EPI' COLLATE NOCASE").get(categoriaId)
+  if (!epi) return { epi: 0, ca: null, ca_validade: null, troca_dias: null }
+
+  const ca = input.ca === undefined ? atual?.ca ?? null : texto(input.ca)?.replace(/^CA\s*/i, '') || null
+  const validade = input.ca_validade === undefined ? atual?.ca_validade ?? null : texto(input.ca_validade)
+  if (validade && !/^\d{4}-\d{2}-\d{2}$/.test(validade)) throw new Error('Validade do CA inválida')
+  let troca = input.troca_dias === undefined ? atual?.troca_dias ?? null : vazio(input.troca_dias) ? null : Number(input.troca_dias)
+  if (troca !== null && (!Number.isInteger(troca) || troca <= 0)) throw new Error('Prazo de troca inválido: informe um número inteiro de dias')
+  if (troca === 0) troca = null
+  return { epi: 1, ca, ca_validade: validade, troca_dias: troca }
 }
 
 function vazio(valor: unknown) {
@@ -260,9 +288,10 @@ export function criarProduto(input: ProdutoInput) {
     const codigo = texto(input.codigo)
     verificarDuplicados(nome, codigo)
 
+    const epi = dadosEpi(input, undefined, categoriaId)
     const result = db.prepare(
-      'INSERT INTO produtos (nome,categoria_id,quantidade_atual,estoque_minimo,unidade,codigo,localizacao) VALUES (?,?,?,?,?,?,?)'
-    ).run(nome, categoriaId, quantidade, minimo, unidade, codigo, texto(input.localizacao))
+      'INSERT INTO produtos (nome,categoria_id,quantidade_atual,estoque_minimo,unidade,codigo,localizacao,epi,ca,ca_validade,troca_dias) VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+    ).run(nome, categoriaId, quantidade, minimo, unidade, codigo, texto(input.localizacao), epi.epi, epi.ca, epi.ca_validade, epi.troca_dias)
     const id = Number(result.lastInsertRowid)
     if (quantidade > 0) {
       db.prepare(
@@ -282,15 +311,18 @@ export function atualizarProduto(id: number, input: Omit<ProdutoInput, 'quantida
   if (!nome) throw new Error('Nome é obrigatório')
   const codigo = input.codigo === undefined ? atual.codigo : texto(input.codigo)
   verificarDuplicados(nome, codigo, id)
+  const categoriaId = input.categoria_id === undefined ? atual.categoria_id : categoriaValida(input.categoria_id)
+  const epi = dadosEpi(input, atual)
   db.prepare(`
-    UPDATE produtos SET nome=?, categoria_id=?, estoque_minimo=?, unidade=?, codigo=?, localizacao=? WHERE id=?
+    UPDATE produtos SET nome=?, categoria_id=?, estoque_minimo=?, unidade=?, codigo=?, localizacao=?, epi=?, ca=?, ca_validade=?, troca_dias=? WHERE id=?
   `).run(
     nome,
-    input.categoria_id === undefined ? atual.categoria_id : categoriaValida(input.categoria_id),
+    categoriaId,
     input.minimo === undefined ? atual.estoque_minimo : minimoValido(input.minimo),
     input.unidade === undefined ? atual.unidade : texto(input.unidade)?.toUpperCase() || 'UN',
     codigo,
     input.localizacao === undefined ? atual.localizacao : texto(input.localizacao),
+    epi.epi, epi.ca, epi.ca_validade, epi.troca_dias,
     id
   )
 }
@@ -558,6 +590,12 @@ export function obterRequisicao(id: number) {
   return { ...requisicao, itens }
 }
 
+/** Grava o item da retirada; se for EPI, guarda junto o CA vigente (vai para a ficha do funcionário). */
+const INSERIR_ITEM_REQUISICAO = `
+  INSERT INTO requisicao_itens (requisicao_id,produto_id,quantidade,unidade,produto_nome,ca)
+  VALUES (?,?,?,?,?,(SELECT CASE WHEN epi=1 THEN ca END FROM produtos WHERE id=?))
+`
+
 export function criarRequisicao(input: RequisicaoInput) {
   const db = getDb()
   return db.transaction(() => {
@@ -576,7 +614,7 @@ export function criarRequisicao(input: RequisicaoInput) {
     const requisicaoId = Number(req.lastInsertRowid)
 
     const baixa = db.prepare('UPDATE produtos SET quantidade_atual=quantidade_atual-? WHERE id=?')
-    const item = db.prepare('INSERT INTO requisicao_itens (requisicao_id,produto_id,quantidade,unidade,produto_nome) VALUES (?,?,?,?,?)')
+    const item = db.prepare(INSERIR_ITEM_REQUISICAO)
     const mov = db.prepare('INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao,requisicao_id,origem,usuario_id,usuario_nome) VALUES (?,?,?,?,?,?,?,?,?)')
 
     for (const entrada of itens) {
@@ -586,7 +624,7 @@ export function criarRequisicao(input: RequisicaoInput) {
         throw new Error(`Quantidade indisponível: ${produto.nome}. Disponível para retirada: ${produto.disponivel} ${produto.unidade}.`)
       }
       baixa.run(entrada.quantidade, produto.id)
-      item.run(requisicaoId, produto.id, entrada.quantidade, produto.unidade, produto.nome)
+      item.run(requisicaoId, produto.id, entrada.quantidade, produto.unidade, produto.nome, produto.id)
       mov.run(produto.id, 'SAIDA', entrada.quantidade, nome, `Requisição ${numero}${finalidade ? ' - ' + finalidade : ''}`, requisicaoId, 'REQUISICAO', ...autor())
     }
     return requisicaoId
@@ -729,14 +767,14 @@ export function retirarReserva(id: number, retiradoPor: unknown, funcionarioId?:
 
     const estoque = db.prepare('SELECT quantidade_atual FROM produtos WHERE id=?')
     const baixa = db.prepare('UPDATE produtos SET quantidade_atual=quantidade_atual-? WHERE id=?')
-    const item = db.prepare('INSERT INTO requisicao_itens (requisicao_id,produto_id,quantidade,unidade,produto_nome) VALUES (?,?,?,?,?)')
+    const item = db.prepare(INSERIR_ITEM_REQUISICAO)
     const mov = db.prepare('INSERT INTO movimentacoes (produto_id,tipo,quantidade,responsavel,observacao,requisicao_id,origem,usuario_id,usuario_nome) VALUES (?,?,?,?,?,?,?,?,?)')
 
     for (const i of itens) {
       const p = estoque.get(i.produto_id) as { quantidade_atual: number } | undefined
       if (!p || p.quantidade_atual < i.quantidade) throw new Error(`Estoque insuficiente para ${i.produto_nome}`)
       baixa.run(i.quantidade, i.produto_id)
-      item.run(reqId, i.produto_id, i.quantidade, i.unidade, i.produto_nome)
+      item.run(reqId, i.produto_id, i.quantidade, i.unidade, i.produto_nome, i.produto_id)
       mov.run(i.produto_id, 'SAIDA', i.quantidade, nome, `Retirada da reserva ${reserva.numero} - Requisição ${numeroReq}`, reqId, 'RESERVA', ...autor())
     }
 

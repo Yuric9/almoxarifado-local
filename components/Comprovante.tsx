@@ -70,7 +70,7 @@ export function Comprovante({ requisicao, empresa, setor, aoFechar, aoEstornar }
             {requisicao.itens.map((i, n) => (
               <tr key={i.id} className="border-b border-slate-200 last:border-0">
                 <td className="px-3 py-2 text-slate-500">{n + 1}</td>
-                <td className="px-3 py-2">{i.produto_nome}</td>
+                <td className="px-3 py-2">{i.produto_nome}{i.ca && <span className="ml-2 text-xs text-slate-500">EPI · CA {i.ca}</span>}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatarQtd(i.quantidade)}</td>
                 <td className="px-3 py-2">{i.unidade}</td>
               </tr>

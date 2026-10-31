@@ -2,6 +2,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, formatarQtd } from '@/lib/cliente'
 import type { Funcionario, Produto, ReservaDetalhe, ReservaResumo, Setor } from '@/lib/tipos'
+import { dataBr, situacaoCa } from '@/lib/tipos'
 import { ItensMateriais, itensPreenchidos, linhaVazia, type LinhaItem } from './ItensMateriais'
 import { SeletorFuncionario, type Pessoa } from './SeletorFuncionario'
 import { SeletorMaterial } from './SeletorMaterial'
@@ -104,11 +105,29 @@ export function RequisicaoModal({ produtos, entreguePorPadrao, aoFechar, aoConcl
         <Campo rotulo="Entregue por" opcional><input value={dados.entregue_por} onChange={campo('entregue_por')} className={classeInput} /></Campo>
       </div>
       <ItensMateriais produtos={produtos} linhas={linhas} aoMudar={setLinhas} avisoDisponivel="O restante está reservado ou em falta." />
+      <AvisoEpi produtos={produtos} linhas={linhas} cadastrado={!!pessoa.funcionario_id} />
       <Campo rotulo="Observação" opcional>
         <textarea value={dados.observacao} onChange={campo('observacao')} className={classeTextarea} />
       </Campo>
       <AvisoErro texto={erro} />
     </ModalFormulario>
+  )
+}
+
+/** Avisos de EPI na retirada: CA vencido e entrega para quem não está cadastrado (não entra em ficha). */
+function AvisoEpi({ produtos, linhas, cadastrado }: { produtos: Produto[]; linhas: LinhaItem[]; cadastrado: boolean }) {
+  const epis = linhas.map(l => produtos.find(p => String(p.id) === l.produto_id)).filter((p): p is Produto => !!p?.epi)
+  if (!epis.length) return null
+  const vencidos = epis.filter(p => situacaoCa(p) === 'VENCIDO')
+  const avisos = [
+    ...vencidos.map(p => `${p.nome}: CA ${p.ca || ''} vencido em ${dataBr(p.ca_validade)}. A NR-6 não permite entregar EPI com CA vencido.`),
+    ...(!cadastrado ? ['Há EPI nesta retirada: escolha um funcionário cadastrado para a entrega ir para a ficha de EPI dele.'] : [])
+  ]
+  if (!avisos.length) return null
+  return (
+    <div role="note" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+      {avisos.map(a => <p key={a}>{a}</p>)}
+    </div>
   )
 }
 

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowDownToLine, ArrowUpFromLine, ChevronRight, Ellipsis, FileSpreadsheet, FileText, FileUp, PackageMinus, Plus, Search, Tags } from 'lucide-react'
 import { api, ehHoje, formatarDataCurta, formatarQtd, mensagemErro } from '@/lib/cliente'
-import { descreverOrigem, type CategoriaResumo, type Movimentacao, type Produto, type RequisicaoResumo, type ReservaResumo } from '@/lib/tipos'
+import { descreverOrigem, situacaoCa, type CategoriaResumo, type Movimentacao, type Produto, type RequisicaoResumo, type ReservaResumo } from '@/lib/tipos'
 import { Badge, Botao, CabecalhoPagina, MenuAcoes, Painel, Tabela, celula, celulaNumero, classeCampo } from './ui'
 import { usePode } from './Perfil'
 
@@ -15,10 +15,17 @@ export function corQuantidade(quantidade: number, minimo: number) {
 
 function situacao(p: Produto) {
   if (!p.ativo) return <Badge>Inativo</Badge>
-  if (p.quantidade_atual <= 0) return <Badge tom="vermelho">Sem estoque</Badge>
-  if (p.quantidade_atual <= p.estoque_minimo) return <Badge tom="amarelo">Abaixo do mínimo</Badge>
   // Situação normal não precisa de destaque: o selo só aparece quando há algo a fazer.
-  return null
+  const estoque = p.quantidade_atual <= 0 ? <Badge tom="vermelho">Sem estoque</Badge>
+    : p.quantidade_atual <= p.estoque_minimo ? <Badge tom="amarelo">Abaixo do mínimo</Badge> : null
+  const ca = situacaoCa(p)
+  if (!ca) return estoque
+  return (
+    <span className="flex flex-wrap gap-1">
+      {estoque}
+      {ca === 'VENCIDO' ? <Badge tom="vermelho">CA vencido</Badge> : <Badge tom="amarelo">CA vencendo</Badge>}
+    </span>
+  )
 }
 
 export function StatusReserva({ status }: { status: string }) {

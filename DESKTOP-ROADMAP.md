@@ -33,7 +33,7 @@
 - [ ] Atualizar a tabela de referência importando a planilha nova da GOINFRA ou do SINAPI
 - [x] Usuários e permissões (login, perfis Administrador/Almoxarife/Consulta, "registrado por")
 - [x] Cadastro de setores/obras e funcionários (consumo por setor)
-- [ ] Ficha de EPI por funcionário (NR-6, com CA)
+- [x] Ficha de EPI por funcionário (NR-6, com CA)
 - [ ] Empréstimo de ferramentas (sai e volta)
 - [ ] Estoque máximo e lista de reposição
 - [ ] Inventário completo (folha de contagem e divergências)
