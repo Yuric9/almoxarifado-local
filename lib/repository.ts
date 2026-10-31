@@ -110,7 +110,7 @@ function quantidadeValida(valor: unknown, rotulo = 'Quantidade') {
   return n
 }
 
-export function proximoNumero(prefixo: 'REQ' | 'RES' | 'EMP', tabela: 'requisicoes' | 'reservas' | 'emprestimos') {
+export function proximoNumero(prefixo: 'REQ' | 'RES' | 'EMP' | 'INV', tabela: 'requisicoes' | 'reservas' | 'emprestimos' | 'inventarios') {
   const { proximo } = getDb().prepare(`SELECT COALESCE(MAX(id),0)+1 AS proximo FROM ${tabela}`).get() as { proximo: number }
   return `${prefixo}-${new Date().getFullYear()}-${String(proximo).padStart(6, '0')}`
 }
@@ -246,7 +246,7 @@ function dadosEpi(input: ProdutoInput, atual?: Pick<Produto, 'epi' | 'ca' | 'ca_
   return { epi: 1, ca, ca_validade: validade, troca_dias: troca }
 }
 
-function vazio(valor: unknown) {
+export function vazio(valor: unknown) {
   return valor === undefined || valor === null || valor === ''
 }
 
@@ -346,8 +346,9 @@ export function excluirProduto(id: number) {
         (SELECT COUNT(*) FROM movimentacoes WHERE produto_id=? AND origem<>'ESTOQUE_INICIAL') +
         (SELECT COUNT(*) FROM requisicao_itens WHERE produto_id=?) +
         (SELECT COUNT(*) FROM reserva_itens WHERE produto_id=?) +
-        (SELECT COUNT(*) FROM emprestimo_itens WHERE produto_id=?) AS total
-    `).get(id, id, id, id) as { total: number }
+        (SELECT COUNT(*) FROM emprestimo_itens WHERE produto_id=?) +
+        (SELECT COUNT(*) FROM inventario_itens WHERE produto_id=?) AS total
+    `).get(id, id, id, id, id) as { total: number }
     if (usos.total > 0) throw new Error('Este material já tem movimentações. Para preservar o histórico, use "Inativar".')
     db.prepare('DELETE FROM movimentacoes WHERE produto_id=?').run(id)
     if (!db.prepare('DELETE FROM produtos WHERE id=?').run(id).changes) throw new Error('Material não encontrado')

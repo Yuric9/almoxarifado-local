@@ -194,6 +194,39 @@ function migrar(db: DB) {
   `)
   adicionarColunaSeFaltar(db, 'movimentacoes', 'emprestimo_id', 'INTEGER REFERENCES emprestimos(id)')
 
+  // Inventário completo: guarda o estoque do sistema no início e a contagem de cada material.
+  db.exec(`
+  CREATE TABLE IF NOT EXISTS inventarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero TEXT NOT NULL UNIQUE,
+    descricao TEXT,
+    escopo TEXT NOT NULL,
+    responsavel TEXT,
+    observacao TEXT,
+    status TEXT NOT NULL DEFAULT 'ABERTO' CHECK (status IN ('ABERTO','FINALIZADO','CANCELADO')),
+    usuario_nome TEXT,
+    criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finalizado_em TEXT,
+    finalizado_por TEXT,
+    /** Última movimentação existente no início: o que vier depois "mexeu no meio" do inventário. */
+    ultima_mov_id INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS inventario_itens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    inventario_id INTEGER NOT NULL REFERENCES inventarios(id) ON DELETE CASCADE,
+    produto_id INTEGER NOT NULL REFERENCES produtos(id),
+    produto_nome TEXT NOT NULL,
+    unidade TEXT NOT NULL,
+    categoria TEXT,
+    localizacao TEXT,
+    quantidade_sistema REAL NOT NULL,
+    quantidade_contada REAL,
+    ajuste REAL
+  );
+  CREATE INDEX IF NOT EXISTS idx_inventario_itens_inventario ON inventario_itens(inventario_id);
+  `)
+  adicionarColunaSeFaltar(db, 'movimentacoes', 'inventario_id', 'INTEGER REFERENCES inventarios(id)')
+
   db.exec(`
   CREATE TABLE IF NOT EXISTS configuracoes (
     chave TEXT PRIMARY KEY,
