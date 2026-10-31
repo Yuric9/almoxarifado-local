@@ -6,7 +6,7 @@ import { MOTIVOS_BAIXA, type MotivoBaixa } from './constantes'
 import { getDb } from './db'
 
 /** Quem está registrando a operação (vem do login); [id, nome]. */
-function autor(): [number | null, string | null] {
+export function autor(): [number | null, string | null] {
   const u = usuarioAtual()
   return [u?.id ?? null, u?.nome ?? null]
 }
@@ -99,7 +99,7 @@ export type Reserva = {
 
 /* ------------------------------------------------------------------ utilidades */
 
-function texto(valor: unknown) {
+export function texto(valor: unknown) {
   const t = typeof valor === 'string' ? valor.trim() : ''
   return t || null
 }
@@ -110,7 +110,7 @@ function quantidadeValida(valor: unknown, rotulo = 'Quantidade') {
   return n
 }
 
-function proximoNumero(prefixo: 'REQ' | 'RES', tabela: 'requisicoes' | 'reservas') {
+export function proximoNumero(prefixo: 'REQ' | 'RES' | 'EMP', tabela: 'requisicoes' | 'reservas' | 'emprestimos') {
   const { proximo } = getDb().prepare(`SELECT COALESCE(MAX(id),0)+1 AS proximo FROM ${tabela}`).get() as { proximo: number }
   return `${prefixo}-${new Date().getFullYear()}-${String(proximo).padStart(6, '0')}`
 }
@@ -128,7 +128,7 @@ export function consolidarItens(itens: ItemInput[]) {
 
 type Disponibilidade = { id: number; nome: string; unidade: string; ativo: number; quantidade_atual: number; reservada: number; disponivel: number }
 
-function disponibilidade(produtoId: number): Disponibilidade {
+export function disponibilidade(produtoId: number): Disponibilidade {
   const p = getDb().prepare(`
     SELECT p.id, p.nome, p.unidade, p.ativo, p.quantidade_atual,
       COALESCE((
@@ -345,8 +345,9 @@ export function excluirProduto(id: number) {
       SELECT
         (SELECT COUNT(*) FROM movimentacoes WHERE produto_id=? AND origem<>'ESTOQUE_INICIAL') +
         (SELECT COUNT(*) FROM requisicao_itens WHERE produto_id=?) +
-        (SELECT COUNT(*) FROM reserva_itens WHERE produto_id=?) AS total
-    `).get(id, id, id) as { total: number }
+        (SELECT COUNT(*) FROM reserva_itens WHERE produto_id=?) +
+        (SELECT COUNT(*) FROM emprestimo_itens WHERE produto_id=?) AS total
+    `).get(id, id, id, id) as { total: number }
     if (usos.total > 0) throw new Error('Este material já tem movimentações. Para preservar o histórico, use "Inativar".')
     db.prepare('DELETE FROM movimentacoes WHERE produto_id=?').run(id)
     if (!db.prepare('DELETE FROM produtos WHERE id=?').run(id).changes) throw new Error('Material não encontrado')

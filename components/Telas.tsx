@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowDownToLine, ArrowUpFromLine, ChevronRight, Ellipsis, FileSpreadsheet, FileText, FileUp, PackageMinus, Plus, Search, Tags } from 'lucide-react'
 import { api, ehHoje, formatarDataCurta, formatarQtd, mensagemErro } from '@/lib/cliente'
-import { descreverOrigem, situacaoCa, type CategoriaResumo, type Movimentacao, type Produto, type RequisicaoResumo, type ReservaResumo } from '@/lib/tipos'
+import { descreverOrigem, situacaoCa, type CategoriaResumo, type Emprestimo, type Movimentacao, type Produto, type RequisicaoResumo, type ReservaResumo } from '@/lib/tipos'
 import { Badge, Botao, CabecalhoPagina, MenuAcoes, Painel, Tabela, celula, celulaNumero, classeCampo } from './ui'
 import { usePode } from './Perfil'
 
@@ -65,6 +65,7 @@ export type Navegar = (destino:
   | { tela: 'materiais'; alerta?: boolean }
   | { tela: 'reservas' }
   | { tela: 'retiradas' }
+  | { tela: 'emprestimos' }
   | { tela: 'movimentacoes'; hoje?: boolean }
 ) => void
 
@@ -81,10 +82,22 @@ export function TelaPainel({ produtos, movs, reservas, acoes, navegar, abrirMate
   const alerta = ativos.filter(p => p.quantidade_atual <= p.estoque_minimo)
   const abertas = reservas.filter(r => r.status === 'SEPARADO' || r.status === 'AGUARDANDO_RETIRADA')
   const hoje = movs.filter(m => ehHoje(m.criado_em))
+  const [atrasados, setAtrasados] = useState<Emprestimo[]>([])
+  useEffect(() => {
+    api<Emprestimo[]>('/api/emprestimos').then(l => setAtrasados(l.filter(e => e.atrasado))).catch(() => {})
+  }, [])
 
   return (
     <>
       <CabecalhoPagina titulo="Painel" descricao="Resumo do estoque" acoes={acoes} />
+      {atrasados.length > 0 && (
+        <button onClick={() => navegar({ tela: 'emprestimos' })}
+          className="mb-4 flex w-full items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-left text-sm text-red-800 hover:bg-red-100">
+          <b>{atrasados.length} {atrasados.length === 1 ? 'empréstimo atrasado' : 'empréstimos atrasados'}</b>
+          <span className="truncate">· {atrasados.slice(0, 3).map(e => e.retirado_por).join(', ')}{atrasados.length > 3 ? '…' : ''}</span>
+          <span className="ml-auto shrink-0 font-medium">Ver empréstimos ›</span>
+        </button>
+      )}
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Indicador rotulo="Materiais" valor={ativos.length} detalhe="cadastrados e ativos" onClick={() => navegar({ tela: 'materiais' })} />
         <Indicador rotulo="Abaixo do mínimo" valor={alerta.length} detalhe="precisam de reposição" alerta onClick={() => navegar({ tela: 'materiais', alerta: true })} />

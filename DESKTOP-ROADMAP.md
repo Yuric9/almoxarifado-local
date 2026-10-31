@@ -34,7 +34,7 @@
 - [x] Usuários e permissões (login, perfis Administrador/Almoxarife/Consulta, "registrado por")
 - [x] Cadastro de setores/obras e funcionários (consumo por setor)
 - [x] Ficha de EPI por funcionário (NR-6, com CA)
-- [ ] Empréstimo de ferramentas (sai e volta)
+- [x] Empréstimo de ferramentas (sai e volta)
 - [ ] Estoque máximo e lista de reposição
 - [ ] Inventário completo (folha de contagem e divergências)
 - [ ] Cadastro de fornecedores e pedidos de compra
